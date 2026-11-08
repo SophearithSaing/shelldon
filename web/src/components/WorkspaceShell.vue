@@ -4,6 +4,7 @@ import UiButton from './ui/UiButton.vue'
 
 defineProps<{ hasFileRail: boolean; conversationTitle: string }>()
 const conversationOpen = defineModel<boolean>('conversationOpen', { default: false })
+const filesOpen = defineModel<boolean>('filesOpen', { default: true })
 const id = useId()
 const content = ref<HTMLElement>()
 const conversationHeading = ref<HTMLElement>()
@@ -59,7 +60,7 @@ async function closeConversation(): Promise<void> {
       <div class="workspace-navigation"><slot name="tabs" /></div>
       <div class="workspace-panes" role="region" aria-label="Review panes" tabindex="0">
         <aside v-show="hasFileRail" class="workspace-files" aria-label="Changed files">
-          <details ref="fileDisclosure" class="file-disclosure" open @keydown.esc.stop="collapseFiles">
+          <details ref="fileDisclosure" class="file-disclosure" :open="filesOpen" @toggle="filesOpen = ($event.target as HTMLDetailsElement).open" @keydown.esc.stop="collapseFiles">
             <summary aria-label="Changed files">
               <span aria-hidden="true">☷</span>
               <span class="files-title">Changed files</span>
@@ -131,7 +132,7 @@ async function closeConversation(): Promise<void> {
    padding-inline: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
-.workspace-navigation :deep(.ui-tabs button) { min-height: var(--target-control); }
+.workspace-navigation :deep(.ui-tabs button), .workspace-navigation :deep(.real-tabs .ui-button) { min-height: calc(var(--target-control) - 1px); }
 .workspace-panes {
   display: grid;
    grid-template-columns: minmax(0, 1fr) 2.5rem;

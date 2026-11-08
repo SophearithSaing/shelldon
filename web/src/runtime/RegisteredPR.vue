@@ -4,18 +4,18 @@ import WorkspaceShell from '../components/WorkspaceShell.vue'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import ChangedFileTree from '../components/ChangedFileTree.vue'
-import SourceQuestions from './SourceQuestions.vue'
+import PinnedFiles from './PinnedFiles.vue'
+import FileUnderstanding from '../components/FileUnderstanding.vue'
 import QuestionConversation from './QuestionConversation.vue'
 import SavedQuestions from './SavedQuestions.vue'
 import QuizView from './QuizView.vue'
 import SemanticView from './SemanticView.vue'
 import { semanticLines, type SemanticAnchor } from './semantic'
 import type { QuizEvidence } from './quiz'
-import { useConversations } from './conversations'
+import { useConversations, type RuntimeThread } from './conversations'
 import UiButton from '../components/ui/UiButton.vue'
 import OpenPR from './OpenPR.vue'
 import { lineCounts, type SourceRequest, type SourceResponse, type SourceFile, type PinnedDiff } from './source'
-import type { DiffLine } from '../components/diff'
 import type { ReviewState, RuntimeClient, RegisteredPR } from './client'
 import type { InitialQuestion, QuestionAnswer } from './questions'
 
@@ -32,10 +32,12 @@ const search = ref('')
 const branch = ref('')
 const sourceHeading = ref<HTMLElement>()
 const sourcePane = ref<HTMLElement>()
-const sourceQuestions = ref<InstanceType<typeof SourceQuestions>>()
+const sourceQuestions = ref<InstanceType<typeof PinnedFiles>>()
+const understood = ref<Record<string, boolean>>({})
 const workspace = ref<InstanceType<typeof WorkspaceShell>>()
 const drafting = ref(false)
 const conversationOpen = ref(false)
+const filesOpen = ref(true)
 const conversations = useConversations((): RuntimeClient | null => props.client)
 const { threads, selectedID, current: currentThread } = conversations
 const { list: savedList, pending: historyPending, error: historyError } = conversations.history
@@ -47,7 +49,6 @@ let openEpoch = 0
 const initialSending = ref(false)
 const revisionBusy = computed((): string => diff.value ? initialSending.value ? 'A question is awaiting admission in this shared PR-revision session. Drafts stay editable.' : conversations.busy(diff.value.revisionID) : '')
 const currentBusy = computed((): string => currentThread.value ? conversations.busy(currentThread.value.turns[0]!.answer.revisionID) || (initialSending.value && currentThread.value.turns[0]!.answer.revisionID === diff.value?.revisionID ? 'Another question is awaiting admission in this shared PR-revision session.' : '') : '')
-const activeMarkers = computed((): { answer: QuestionAnswer; anchor: InitialQuestion['anchor'] }[] => threads.value.filter((item): boolean => item.turns[0]!.answer.revisionID === diff.value?.revisionID && item.input.anchor.fileID === active.value?.id).map((item): { answer: QuestionAnswer; anchor: InitialQuestion['anchor'] } => ({ answer: item.turns[0]!.answer, anchor: item.input.anchor })))
 const questionCounts = computed((): Record<string, number> => {
   const result: Record<string, number> = {}
   for (const item of threads.value) if (item.turns[0]!.answer.revisionID === diff.value?.revisionID) result[item.input.anchor.fileID] = (result[item.input.anchor.fileID] ?? 0) + 1
@@ -61,8 +62,6 @@ const files = computed((): SourceFile[] => diff.value?.files ?? [])
 const treeFiles = computed((): { id: string; path: string }[] => files.value.map((file): { id: string; path: string } => ({ id: file.id, path: file.newPath ?? file.oldPath ?? '' })))
 const active = computed((): SourceFile | undefined => files.value.find((file): boolean => file.id === selected.value))
 const counts = computed((): ReturnType<typeof lineCounts> => lineCounts(files.value))
-const currentCounts = computed((): ReturnType<typeof lineCounts> => lineCounts(active.value ? [active.value] : []))
-const lines = computed(displayLines)
 
 /** Clears only this tab's transient source and cancels requests on disconnection. */
 function reset(): void {
@@ -86,6 +85,7 @@ function reset(): void {
   conversations.clear()
   initialSending.value = false
   conversationOpen.value = false
+  understood.value = {}
   emit('questions', false)
 }
 
@@ -133,6 +133,7 @@ async function load(input: SourceRequest = { action: 'load' }): Promise<void> {
       const path = active.value?.newPath ?? active.value?.oldPath
       const unchanged = response.diff.revisionID === requestedSnapshot
       displayed.value = response
+      if (!unchanged) understood.value = {}
       selected.value = response.diff.files.find((file): boolean => (file.newPath ?? file.oldPath) === path)?.id ?? response.diff.files[0]?.id ?? ''
       stale.value = false
       notice.value = requestedSnapshot ? unchanged ? 'Source unchanged. The displayed revision is still pinned.' : 'Refresh complete. Only this tab now displays the new pinned revision.' : ''
@@ -175,26 +176,8 @@ function selectBase(): void {
  */
 async function selectFile(id: string): Promise<void> {
   openEpoch++
-  if (drafting.value && id !== selected.value) { notice.value = 'Finish or discard the pinned question draft before changing files.'; return }
   selected.value = id
-  await nextTick()
-  sourceHeading.value?.focus()
-}
-
-/**
- * Adapts verified hunks to the shared literal-source renderer without sample content.
- * @returns Pinned display lines including hunk boundaries and final-LF markers.
- */
-function displayLines(): DiffLine[] {
-  const result: DiffLine[] = []
-  for (const hunk of active.value?.hunks ?? []) {
-    for (const [index, line] of hunk.lines.entries()) result.push({
-      id: line.id, hunkID: hunk.id, base: line.oldLine ?? null, head: line.newLine ?? null,
-      kind: line.sign === '+' ? 'added' : line.sign === '-' ? 'removed' : 'context', text: line.text, noNewline: line.noNewline,
-      hunkHeader: index === 0 ? `@@ -${hunk.old.start},${hunk.old.count} +${hunk.new.start},${hunk.new.count} @@${hunk.section}` : undefined,
-    })
-  }
-  return result
+  await sourceQuestions.value?.selectFile(id)
 }
 
 /**
@@ -203,10 +186,40 @@ function displayLines(): DiffLine[] {
  * @param input Original question and pinned selection.
  */
 function admitted(answer: QuestionAnswer, input: InitialQuestion): void {
-  const file = active.value
+  const file = files.value.find((item): boolean => item.id === input.anchor.fileID)
   const path = input.anchor.kind === 'lines' && input.anchor.side === 'old' ? file?.oldPath : file?.newPath ?? file?.oldPath
   conversations.add(answer, input, path ?? 'Original pinned source')
-  conversationOpen.value = true
+}
+
+/** Finds the canonical state shared by inline and panel views.
+ * @param threadID Existing thread identity.
+ * @returns Its retained thread state.
+ */
+function threadFor(threadID: string): RuntimeThread {
+  return threads.value.find((thread): boolean => thread.id === threadID)!
+}
+
+/** Returns exact-revision sending availability without sharing drafts between threads.
+ * @param thread Canonical retained thread.
+ * @returns Existing session busy explanation.
+ */
+function busyFor(thread: RuntimeThread): string {
+  return conversations.busy(thread.turns[0]!.answer.revisionID) || (initialSending.value && thread.turns[0]!.answer.revisionID === diff.value?.revisionID ? 'Another question is awaiting admission in this shared PR-revision session.' : '')
+}
+
+/** Reveals the selected conversation only in its matching original loaded source. */
+async function showInline(): Promise<void> {
+  if (!currentThread.value || drafting.value || pending.value || currentThread.value.turns[0]!.answer.revisionID !== diff.value?.revisionID) return
+  changeView('files')
+  await nextTick()
+  await sourceQuestions.value?.showInline(currentThread.value)
+}
+
+/** Toggles reader-reported understanding without inference or persistence.
+ * @param fileID File in the displayed comparison.
+ */
+function toggleUnderstood(fileID: string): void {
+  if (files.value.some((file): boolean => file.id === fileID)) understood.value[fileID] = !understood.value[fileID]
 }
 
 /**
@@ -256,7 +269,7 @@ async function quizSource(evidence: QuizEvidence, revisionID: string): Promise<v
   changeView('files')
   notice.value = `Quiz evidence: original ${evidence.anchor.side} lines ${evidence.anchor.start}–${evidence.anchor.end}. No draft or thread was created.`
   await nextTick()
-  if (diff.value?.revisionID === revisionID && view.value === 'files') sourceHeading.value?.focus()
+  if (diff.value?.revisionID === revisionID && view.value === 'files') await sourceQuestions.value?.selectRange({ kind: 'lines', ...evidence.anchor }, false)
 }
 
 /** Navigates only matching original semantic source, optionally opening an explicit question draft.
@@ -275,7 +288,6 @@ async function semanticSource(anchor: SemanticAnchor, revisionID: string, compos
   await nextTick()
   if (client !== props.client || diff.value?.revisionID !== revisionID || view.value !== 'files' || currentIntent !== openEpoch) return
   await sourceQuestions.value?.selectRange({ kind: 'lines', ...anchor }, compose)
-  if (!compose && currentIntent === openEpoch) sourceHeading.value?.focus()
 }
 
 /**
@@ -328,7 +340,7 @@ onUnmounted(reset)
       <span>Registered PR</span><OpenPR :client="client" /><slot name="runtime-trigger" /><ThemeToggle />
     </header>
     <slot name="runtime-panel" />
-    <WorkspaceShell v-if="reviewState.status === 'registered' && pr" ref="workspace" v-model:conversation-open="conversationOpen" :has-file-rail="view === 'files' && !!diff && files.length > 0" conversation-title="Question conversation">
+    <WorkspaceShell v-if="reviewState.status === 'registered' && pr" ref="workspace" v-model:conversation-open="conversationOpen" v-model:files-open="filesOpen" :has-file-rail="view === 'files' && !!diff && files.length > 0" conversation-title="Question conversation">
       <template #summary>
         <h1 class="pr-title">{{ pr.title ?? `Pull request #${pr.number}` }}</h1>
          <details class="fixture-meta"><summary>PR details</summary><p><span>{{ pr.owner }}/{{ pr.repository }} #{{ pr.number }}</span> · <span>{{ pr.author ? `Author: ${pr.author}` : 'Author unavailable' }}</span><span v-if="diff"> · {{ diff.revision.baseBranch }} · {{ diff.revision.mergeBaseSHA.slice(0, 8) }} → {{ diff.revision.headSHA.slice(0, 8) }}</span></p></details>
@@ -337,15 +349,16 @@ onUnmounted(reset)
       <template #tabs>
         <nav class="real-tabs" aria-label="PR views"><UiButton variant="quiet" :aria-current="view === 'files' ? 'page' : undefined" @click="changeView('files')">Files changed<span v-if="diff"> ({{ files.length }})</span></UiButton><UiButton variant="quiet" :aria-current="view === 'questions' ? 'page' : undefined" @click="changeView('questions')">Questions</UiButton><UiButton variant="quiet" :aria-current="view === 'quiz' ? 'page' : undefined" @click="changeView('quiz')">Quiz</UiButton><UiButton variant="quiet" :aria-current="view === 'semantic' ? 'page' : undefined" @click="changeView('semantic')">Semantic review</UiButton><UiButton v-if="threads.length && !conversationOpen" variant="quiet" @click="workspace?.openConversation($event)">Open conversation</UiButton></nav>
       </template>
-      <template #files><ChangedFileTree v-model="search" :files="treeFiles" :current="selected" :counts="questionCounts" :viewed="{}" real @select="selectFile" /></template>
+      <template #files><FileUnderstanding :files="files" :understood="understood" /><ChangedFileTree v-model="search" :files="treeFiles" :current="selected" :counts="questionCounts" :viewed="understood" real @select="selectFile" /></template>
+      <template #progress>{{ files.length ? Math.round(100 * files.filter((file): boolean => understood[file.id]).length / files.length) : 0 }}%</template>
       <template #conversation>
-        <QuestionConversation v-if="currentThread" :thread="currentThread" :threads="threads" :busy-reason="currentBusy" :displayed-revision="diff?.revisionID" :history-pending="historyPending" :history-error="historyError" @refresh="conversations.refreshSaved(currentThread)" @followup="conversations.followup" @stop="conversations.stop" @observe="conversations.observe" @save="conversations.save" @select="selectThread" />
+        <QuestionConversation v-if="currentThread" :thread="currentThread" :threads="threads" :busy-reason="currentBusy" :displayed-revision="diff?.revisionID" :history-pending="historyPending" :history-error="historyError" :can-show-inline="!drafting && !pending && currentThread.turns[0]!.answer.revisionID === diff?.revisionID" @source="showInline" @refresh="conversations.refreshSaved(currentThread)" @followup="conversations.followup" @stop="conversations.stop" @observe="conversations.observe" @save="conversations.save" @select="selectThread" />
       </template>
       <template #default>
         <QuizView v-if="quizOpened" v-show="view === 'quiz'" :pr-i-d="reviewId" :client="client" :active="view === 'quiz'" :diff="diff" :drafting="drafting" @source="quizSource" />
-        <SemanticView v-if="semanticOpened" v-show="view === 'semantic'" :pr-i-d="reviewId" :client="client" :active="view === 'semantic'" :diff="diff" :drafting="drafting || pending" @source="semanticSource" />
+        <SemanticView v-if="semanticOpened" v-show="view === 'semantic'" v-model:groups-open="filesOpen" :pr-i-d="reviewId" :client="client" :active="view === 'semantic'" :diff="diff" :drafting="drafting || pending" :understood="understood" @understood="toggleUnderstood" @source="semanticSource" />
         <SavedQuestions v-show="view === 'questions'" :list="savedList" :threads="threads" :pending="historyPending" :error="historyError" :opening="opening" :selected="selectedID" :drafting="drafting" @refresh="conversations.history.refreshList(reviewId)" @open="openThread" />
-        <section v-show="view === 'files'" id="review-content" ref="sourcePane" class="source-pane" tabindex="-1" :aria-busy="pending && !diff" aria-label="Pinned PR source">
+        <section v-show="view === 'files'" id="review-content" ref="sourcePane" class="source-pane" tabindex="-1" :aria-busy="pending && !diff" aria-label="Pinned PR source" @scroll.passive="sourceQuestions?.updateCurrent()">
           <div v-if="diff" class="refresh-controls">
             <div class="refresh-actions"><UiButton :disabled="pending || !client" @click="refresh">Refresh source</UiButton><UiButton v-if="pending" variant="quiet" @click="cancelSource">Cancel source request</UiButton></div>
             <p v-if="pending" role="status">Refreshing source… The displayed revision remains readable until a complete response succeeds.</p>
@@ -369,12 +382,9 @@ onUnmounted(reset)
           </div>
           <template v-if="diff">
             <div class="revision-bar"><p>{{ files.length }} changed files · +{{ counts.added }} / −{{ counts.removed }} text lines</p><details><summary>Pinned revision {{ diff.revisionID.slice(0, 8) }}</summary><dl><dt>Base branch / tip</dt><dd>{{ diff.revision.baseBranch }} / {{ diff.revision.baseSHA }}</dd><dt>Merge base</dt><dd>{{ diff.revision.mergeBaseSHA }}</dd><dt>Head</dt><dd>{{ diff.revision.headSHA }}</dd><dt>Base selection</dt><dd>{{ diff.revision.baseSource === 'github' ? 'GitHub metadata' : 'Explicit Git-only selection; target unverified by GitHub' }}</dd><dt>Revision</dt><dd>{{ diff.revisionID }}</dd></dl></details></div>
-            <template v-if="active">
-              <header class="file-header"><h2 ref="sourceHeading" tabindex="-1">{{ active.newPath ?? active.oldPath }}</h2><div class="file-tools"><span>{{ active.status }} · {{ active.kind }} · +{{ currentCounts.added }} / −{{ currentCounts.removed }}</span><span>Unified</span><UiButton variant="quiet" disabled title="Split diff is not implemented">Split — unavailable</UiButton></div><p v-if="active.oldPath && active.newPath && active.oldPath !== active.newPath">Renamed from {{ active.oldPath }}</p><p v-if="active.oldMode !== active.newMode">Mode {{ active.oldMode }} → {{ active.newMode }}</p></header>
-              <SourceQuestions v-if="active.kind === 'text' && client" ref="sourceQuestions" :key="diff.revisionID" :diff="diff" :file="active" :lines="lines" :client="client" :source-pending="pending" :markers="activeMarkers" :busy-reason="revisionBusy" @guard="guardDraft" @sending="initialSending = $event" @admitted="admitted" @open="openAnswer" />
-              <div v-else class="source-notice" role="status"><h3>{{ active.kind }} change</h3><p>{{ active.reason ?? 'This change has no unified text lines. No source lines are invented.' }}</p><p>Line questions are unavailable for non-text changes.</p><p v-if="active.kind === 'submodule'">Submodules are not initialized.</p><p>Old object: {{ active.oldObject }}</p><p>New object: {{ active.newObject }}</p></div>
-            </template>
-            <div v-else class="source-notice" role="status"><h2>No changes in this comparison</h2><p>The pinned merge base and head have an empty diff.</p></div>
+            <PinnedFiles v-if="client" ref="sourceQuestions" :key="diff.revisionID" v-model:selected="selected" :diff="diff" :client="client" :threads="threads" :pending="pending" :busy-reason="revisionBusy" :understood="understood" @understood="toggleUnderstood" @guard="guardDraft" @sending="initialSending = $event" @admitted="admitted" @open="openAnswer">
+              <template #conversation="{ answer }"><QuestionConversation :thread="threadFor(answer.threadID)" :threads="threads" :busy-reason="busyFor(threadFor(answer.threadID))" :displayed-revision="diff.revisionID" :history-pending="historyPending" :history-error="historyError" inline @panel="(trigger): void => openAnswer(answer, trigger)" @refresh="conversations.refreshSaved(threadFor(answer.threadID))" @followup="conversations.followup" @stop="conversations.stop" @observe="conversations.observe" @save="conversations.save" /></template>
+            </PinnedFiles>
           </template>
           <div v-else class="source-notice">
             <template v-if="pending"><h2>Loading pinned source…</h2><p role="status">Resolving metadata, fetched commits, source and a complete diff. Loading source does not start inference.</p><div class="source-skeleton" aria-hidden="true"><span v-for="n in 6" :key="n" /></div><UiButton variant="quiet" @click="cancelSource">Cancel source loading</UiButton></template>

@@ -96,7 +96,7 @@ test('initial source loading has decorative skeletons no known revision and no a
   await page.clock.install()
   await page.getByRole('link', { name: 'Open sample dashboard #86', exact: true }).click()
   const main = page.getByRole('main', { name: 'Source loading preview' })
-  expect((await main.boundingBox())!.y).toBeCloseTo(160, 0)
+  expect((await main.boundingBox())!.y).toBeCloseTo(112, 0)
   await expect(main.getByRole('region', { name: 'Unresolved source' })).toHaveAttribute('aria-busy', 'true')
   await expect(page.getByRole('banner', { name: 'Sheldon navigation' })).not.toHaveAttribute('aria-busy')
   await expect(page.getByText('Waiting for source revision', { exact: true }).filter({ visible: true })).toBeVisible()

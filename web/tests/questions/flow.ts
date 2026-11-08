@@ -40,13 +40,18 @@ async function source(page: Page, label: string): Promise<SourceResponse> {
 async function ask(page: Page, text: string): Promise<Response> {
   const form = page.getByRole('form', { name: 'New question', exact: true })
   if (!await form.isVisible()) {
-    await page.getByRole('button', { name: 'Select head line 1', exact: true }).click()
-    await page.getByRole('button', { name: 'Ask about selection', exact: true }).click()
+    await page.getByRole('article', { name: 'Changed file shared.txt', exact: true }).getByRole('button', { name: 'Select head line 1', exact: true }).click()
+    await page.getByRole('article', { name: 'Changed file shared.txt', exact: true }).getByRole('button', { name: 'Ask about selection', exact: true }).click()
   }
   await page.getByRole('textbox', { name: 'Your question', exact: true }).fill(text)
   const received = response(page, '/questions')
   await page.getByRole('button', { name: 'Send question', exact: true }).click()
-  return received
+  const result = await received
+  if (result.status() === 202) {
+    await page.getByRole('button', { name: 'Open in panel', exact: true }).click()
+    await page.getByRole('button', { name: 'Hide inline', exact: true }).last().click()
+  }
+  return result
 }
 
 /**

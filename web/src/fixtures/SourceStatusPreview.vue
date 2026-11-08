@@ -22,7 +22,7 @@ function failureText(): string {
 
 <template>
   <div class="source-status-workspace">
-    <section class="source-request-summary" aria-label="Pull request being opened"><div><h1>{{ state === 'loading' ? 'Opening pull request' : 'Source unavailable' }} <span>#{{ pr.number }}</span></h1><p><code>{{ pr.ownerRepository }}</code> · {{ state === 'loading' ? 'Metadata, changed files and diff · sample loading state' : 'Selected source-error preview' }}</p></div><UiButton @click="emit('library')">Back to all PRs</UiButton></section>
+    <section class="source-request-summary" aria-label="Pull request being opened"><h1>{{ state === 'loading' ? 'Opening pull request' : 'Source unavailable' }} <span>#{{ pr.number }}</span></h1><details><summary>PR details</summary><p><code>{{ pr.ownerRepository }}</code> · {{ state === 'loading' ? 'Metadata, changed files and diff · sample loading state' : 'Selected source-error preview' }}</p></details><UiButton @click="emit('library')">Back to all PRs</UiButton></section>
     <nav class="source-pending-navigation" aria-label="Unavailable PR content"><div><UiButton v-for="label in ['Files changed', 'Questions', 'Quiz', 'Semantic review']" :key="label" variant="quiet" disabled :aria-describedby="`${id}-pending-reason`">{{ label }}</UiButton></div><span>Waiting for source revision</span></nav>
     <main class="source-status-body" tabindex="-1" aria-label="Source loading preview">
       <p :id="`${id}-pending-reason`" class="source-disclosure" role="status">{{ state === 'loading' ? 'Source-loading UI preview only. No fetch is running, no progress is measured and nothing completes automatically.' : failure }} No agent is running; semantic review never starts from source loading.</p>
@@ -41,13 +41,13 @@ function failureText(): string {
 
 <style scoped>
 .source-status-workspace { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
-.source-request-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 4.1875rem; padding: var(--space-2) var(--space-6); }
+.source-request-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 2.5rem; padding: 0.25rem var(--space-4); }
 .source-request-summary h1 { font-size: var(--text-heading); font-weight: 500; line-height: 1.3; }
 .source-request-summary span, .source-request-summary p { color: var(--color-muted); }
 .source-request-summary p { margin-top: var(--space-1); font-size: var(--text-small); }
-.source-pending-navigation { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 2.8125rem; padding-inline: var(--space-6); border-bottom: 1px solid var(--color-border); }
+.source-pending-navigation { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 2rem; padding-inline: var(--space-4); border-bottom: 1px solid var(--color-border); }
 .source-pending-navigation > div { display: flex; flex-wrap: wrap; }
-.source-pending-navigation .ui-button { min-height: var(--target-control); padding-block: 0; border: 0; border-radius: 0; background: transparent; font-size: var(--text-small); }
+.source-pending-navigation .ui-button { min-height: calc(var(--target-control) - 1px); padding-block: 0; border: 0; border-radius: 0; background: transparent; font-size: var(--text-small); }
 .source-pending-navigation > span { color: var(--color-muted); font-size: var(--text-code-meta); }
 .source-status-body { flex: 1; min-height: 0; overflow: auto; padding: var(--space-3) var(--space-6) var(--space-4); }
 .source-disclosure { margin-bottom: var(--space-3); color: var(--color-muted); font-size: var(--text-small); }

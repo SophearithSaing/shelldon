@@ -6,8 +6,8 @@ import UiField from '../components/ui/UiField.vue'
 import { activeAnswer, type QuestionAnswer } from './questions'
 import type { RuntimeThread, RuntimeTurn } from './conversations'
 
-const props = defineProps<{ thread: RuntimeThread; threads: RuntimeThread[]; busyReason: string; displayedRevision?: string; historyPending?: boolean; historyError?: string }>()
-const emit = defineEmits<{ followup: [thread: RuntimeThread]; stop: [turn: RuntimeTurn]; observe: [turn: RuntimeTurn]; save: [turn: RuntimeTurn]; select: [threadID: string]; refresh: [] }>()
+const props = defineProps<{ thread: RuntimeThread; threads: RuntimeThread[]; busyReason: string; displayedRevision?: string; historyPending?: boolean; historyError?: string; inline?: boolean; canShowInline?: boolean }>()
+const emit = defineEmits<{ followup: [thread: RuntimeThread]; stop: [turn: RuntimeTurn]; observe: [turn: RuntimeTurn]; save: [turn: RuntimeTurn]; select: [threadID: string]; refresh: []; source: []; panel: [trigger: HTMLElement] }>()
 const messages = ref<InstanceType<typeof ScrollRegion>>()
 const scroll = new Map<string, number>()
 const last = computed((): RuntimeTurn => props.thread.turns.at(-1)!)
@@ -96,13 +96,15 @@ function shortcut(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <section class="question-conversation" aria-label="Question conversation">
-    <nav v-if="threads.length > 1" class="thread-switcher" aria-label="Question threads">
+  <section class="question-conversation" :class="{ 'is-inline': inline }" :aria-label="inline ? 'Inline conversation' : 'Question conversation'">
+    <div class="conversation-actions"><UiButton v-if="inline" variant="quiet" @click="emit('panel', $event.currentTarget as HTMLElement)">Open in panel</UiButton><UiButton v-else variant="quiet" :disabled="!canShowInline" @click="emit('source')">Show inline</UiButton></div>
+    <nav v-if="!inline && threads.length > 1" class="thread-switcher" aria-label="Question threads">
       <UiButton v-for="(item, index) in threads" :key="item.id" variant="quiet" :aria-pressed="item.id === thread.id" @click="emit('select', item.id)">Thread {{ index + 1 }} · {{ item.input.question }}</UiButton>
     </nav>
-    <div class="thread-summary">
-      <p>Shared PR-revision context · One active question per revision.</p>
+    <details class="thread-summary"><summary>Shared PR-revision context · One active question per revision.</summary>
       <p>Submitted questions and finished answers are saved locally, with saving confirmed separately below. In-progress text and unsent drafts are not saved. Reload/disconnect clears page state, not accepted execution. Reopen saved history from Questions. Execution is bounded to five minutes including recovery.</p>
+    </details>
+    <div class="thread-feedback">
       <UiButton :disabled="historyPending" @click="emit('refresh')">Refresh saved thread</UiButton>
       <p v-if="historyPending" role="status">Reading saved history… Live text and drafts remain unchanged.</p>
       <p v-if="historyError" class="thread-warning" role="alert">{{ historyError }}</p>
@@ -140,7 +142,7 @@ function shortcut(event: KeyboardEvent): void {
 .question-conversation { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .thread-switcher { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); max-height: 10rem; overflow: auto; }
 .thread-switcher .ui-button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
-.thread-summary, .thread-context { padding: var(--space-3) var(--space-4); color: var(--color-muted); font-size: var(--text-small); overflow-wrap: anywhere; border-bottom: 1px solid var(--color-border); }
+.thread-summary, .thread-context, .thread-feedback { padding: var(--space-3) var(--space-4); color: var(--color-muted); font-size: var(--text-small); overflow-wrap: anywhere; border-bottom: 1px solid var(--color-border); }
 .thread-summary p + p, .thread-context p { margin-top: var(--space-2); }
 .thread-summary .ui-button, .saved-quotes { margin-top: var(--space-3); }
 .saved-quotes summary { min-height: var(--target-control); cursor: pointer; }
@@ -159,4 +161,8 @@ function shortcut(event: KeyboardEvent): void {
 .execution-status { color: var(--color-accent); }
 .thread-warning { color: var(--color-warning); }
 .followup { display: grid; flex-shrink: 0; gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--color-border); }
+.thread-summary summary { cursor: pointer; }
+.conversation-actions { display: flex; justify-content: flex-end; padding-inline: var(--space-3); }
+.is-inline { max-height: 40rem; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-panel); }
+.is-inline .conversation-messages { max-height: 24rem; flex: 1 1 auto; }
 </style>

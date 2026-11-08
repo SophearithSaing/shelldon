@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import WorkspaceShell from '../components/WorkspaceShell.vue'
+import FileUnderstanding from '../components/FileUnderstanding.vue'
 import UiButton from '../components/ui/UiButton.vue'
 import UiTabs from '../components/ui/UiTabs.vue'
 import ChangedFileTree from '../components/ChangedFileTree.vue'
@@ -236,6 +237,7 @@ function selectFile(id: string): void {
         />
       </template>
       <template #files>
+        <FileUnderstanding :files="sampleFiles" :understood="viewed" />
         <ChangedFileTree
           v-model="fileSearch"
           :files="sampleFiles"
@@ -245,6 +247,7 @@ function selectFile(id: string): void {
           @select="selectFile"
         />
       </template>
+      <template #progress>{{ Math.round(100 * sampleFiles.filter((file): boolean => viewed[file.id]).length / sampleFiles.length) }}%</template>
       <template #default>
         <div
           v-show="activeTab === 'files'"

@@ -42,17 +42,11 @@ const visibleGroups = computed(groups)
       <button v-for="file in group.files" :key="file.id" type="button" :aria-label="file.path" :aria-current="current === file.id ? 'true' : undefined" @click="emit('select', file.id)">
         <span aria-hidden="true">▱</span><span class="file-name">{{ file.path.slice(file.path.lastIndexOf('/') + 1) }}</span>
         <span v-if="counts[file.id]" class="file-count" :aria-label="`${counts[file.id]} ${real ? 'runtime' : 'sample'} questions`">{{ counts[file.id] }}</span>
-        <span v-else-if="viewed[file.id]" class="viewed-icon" aria-label="Viewed">✓</span>
+        <span v-else-if="viewed[file.id]" class="viewed-icon" aria-label="Understood">✓</span>
       </button>
     </div>
     <p v-if="visibleGroups.length === 0" role="status">{{ real ? 'No changed paths match.' : 'No sample paths match.' }}</p>
   </nav>
-  <div v-if="!real" class="viewed-summary">
-    <p>Files viewed <strong>{{ files.filter((file) => viewed[file.id]).length }} / {{ files.length }}</strong></p>
-    <div class="viewed-segments" aria-hidden="true"><span v-for="file in files" :key="file.id" :class="{ done: viewed[file.id] }" /></div>
-    <p>At your own pace.</p>
-    <p class="tree-note">Choose line numbers, then Ask. Questions share agent context for this PR revision. Sample data only.</p>
-  </div>
 </template>
 
 <style scoped>

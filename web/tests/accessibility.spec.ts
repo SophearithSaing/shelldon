@@ -69,7 +69,7 @@ test('a narrow container inside a desktop viewport keeps source files and conver
   await page.keyboard.press('Tab')
   await panes.focus()
   await expect(panes).toHaveCSS('outline-width', '2px')
-  await expect(panes).toHaveCSS('outline-color', 'rgb(138, 180, 255)')
+  await expect(panes).toHaveCSS('outline-color', 'rgb(177, 231, 125)')
   await panes.press('PageDown')
   await expect.poll((): Promise<number> => panes.evaluate((element): number => element.scrollTop)).toBeGreaterThan(0)
   await page.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).fill('Container-local draft')

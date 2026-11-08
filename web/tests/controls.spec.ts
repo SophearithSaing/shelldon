@@ -21,7 +21,7 @@ test('unavailable and busy actions guard pointer, keyboard and form submission',
     await button.focus()
     await expect(button).toBeFocused()
     await expect(button).toHaveCSS('outline-width', '2px')
-    await expect(button).toHaveCSS('outline-color', 'rgb(138, 180, 255)')
+    await expect(button).toHaveCSS('outline-color', 'rgb(177, 231, 125)')
     await button.click({ force: true })
     await button.press('Enter')
     await button.press('Space')
@@ -43,25 +43,25 @@ test('unavailable and busy actions guard pointer, keyboard and form submission',
  * Checks Slate target sizes, selected styling and hover feedback.
  * @param fixtures Playwright page fixture.
  */
-test('Slate controls expose readable hover, focus and selected states at usable sizes', async ({ page }): Promise<void> => {
+test('reference controls expose readable hover, focus and selected states at usable sizes', async ({ page }): Promise<void> => {
   const secondary = page.getByRole('button', { name: 'Secondary sample' })
   await expect(secondary).toHaveCSS('font-size', '13px')
-  await expect(secondary).toHaveCSS('border-radius', '8px')
-  await expect(secondary).toHaveCSS('background-color', 'rgb(30, 35, 46)')
+  await expect(secondary).toHaveCSS('border-radius', '6px')
+  await expect(secondary).toHaveCSS('background-color', 'rgb(24, 25, 28)')
   await secondary.hover()
-  await expect(secondary).toHaveCSS('background-color', 'rgb(22, 26, 34)')
+  await expect(secondary).toHaveCSS('background-color', 'rgb(17, 18, 20)')
   const selected = page.getByRole('button', { name: 'Selected sample' })
   await selected.click()
-  await expect(selected).toHaveCSS('background-color', 'rgb(38, 50, 71)')
+  await expect(selected).toHaveCSS('background-color', 'rgb(41, 45, 49)')
   await page.mouse.move(0, 0)
   await expect(selected).toHaveAttribute('aria-pressed', 'true')
-  await expect(selected).toHaveCSS('background-color', 'rgb(38, 50, 71)')
-  await expect(selected).toHaveCSS('color', 'rgb(138, 180, 255)')
-  await expect(page.getByText('Failed', { exact: true })).toHaveCSS('color', 'rgb(232, 174, 181)')
+  await expect(selected).toHaveCSS('background-color', 'rgb(41, 45, 49)')
+  await expect(selected).toHaveCSS('color', 'rgb(177, 231, 125)')
+  await expect(page.getByText('Failed', { exact: true })).toHaveCSS('color', 'rgb(228, 164, 156)')
   for (const control of await page.getByRole('button').all()) {
     const box = await control.boundingBox()
-    expect(box!.height).toBeGreaterThanOrEqual(44)
-    expect(box!.width).toBeGreaterThanOrEqual(44)
+    expect(box!.height).toBeGreaterThanOrEqual(32)
+    expect(box!.width).toBeGreaterThanOrEqual(32)
   }
 })
 
@@ -75,7 +75,7 @@ test('fields associate hints, caller descriptions and dynamic text errors', asyn
   await page.getByRole('button', { name: 'Validate sample' }).click()
   await expect(question).toHaveAttribute('aria-invalid', 'true')
   await expect(question).toHaveAccessibleDescription(/Nothing is sent to an agent.*Local text only.*Error: enter a sample question/)
-  await expect(question).toHaveCSS('border-color', 'rgb(232, 174, 181)')
+  await expect(question).toHaveCSS('border-color', 'rgb(228, 164, 156)')
   await question.fill('A local sample')
   await page.getByRole('button', { name: 'Validate sample' }).click()
   await expect(question).not.toHaveAttribute('aria-invalid')
@@ -127,7 +127,7 @@ test('destination navigation, panel tabs and scroll regions keep distinct semant
   await expect(library).toHaveAttribute('aria-current', 'page')
   await library.focus()
   await expect(library).toHaveCSS('outline-width', '2px')
-  expect((await library.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  expect((await library.boundingBox())!.height).toBeGreaterThanOrEqual(32)
   await library.press('Tab')
   const config = navigation.getByRole('link', { name: 'Configuration preview' })
   await expect(config).toBeFocused()

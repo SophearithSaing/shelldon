@@ -33,7 +33,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>()
   gap: var(--space-2);
   min-height: var(--target-control);
   min-width: var(--target-control);
-  padding: var(--space-2) 0.875rem;
+  padding: var(--space-1) 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-panel);

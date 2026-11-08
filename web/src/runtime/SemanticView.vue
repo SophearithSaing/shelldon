@@ -2,13 +2,15 @@
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import UiButton from '../components/ui/UiButton.vue'
 import SourceDiff from '../components/SourceDiff.vue'
+import FileUnderstanding from '../components/FileUnderstanding.vue'
 import type { DiffLine, LineRange } from '../components/diff'
 import type { RuntimeClient } from './client'
 import type { PinnedDiff, SourceFile } from './source'
 import { semanticActive, semanticLines, semanticUngrouped, type SemanticRead, type SemanticStatus, type SemanticAnchor, type SemanticGroup } from './semantic'
 
-const props = defineProps<{ prID: string; client: RuntimeClient | null; active: boolean; diff?: PinnedDiff; drafting: boolean }>()
-const emit = defineEmits<{ source: [anchor: SemanticAnchor, revisionID: string, compose: boolean] }>()
+const props = defineProps<{ prID: string; client: RuntimeClient | null; active: boolean; diff?: PinnedDiff; drafting: boolean; understood?: Record<string, boolean> }>()
+const emit = defineEmits<{ source: [anchor: SemanticAnchor, revisionID: string, compose: boolean]; understood: [fileID: string] }>()
+const groupsOpen = defineModel<boolean>('groupsOpen', { default: true })
 const selection = shallowRef<SemanticAnchor | null>(null)
 const saved = shallowRef<SemanticRead>()
 const status = shallowRef<SemanticStatus | null>(null)
@@ -197,12 +199,12 @@ onUnmounted(reset)
       <p v-if="saved && !review">No saved semantic review. Opening this view never starts generation.</p>
       <p v-if="review">Original revision {{ review.diff.revisionID.slice(0, 8) }} · saved version {{ saved?.version }} · {{ !diff ? 'Currentness unverified; source is not loaded.' : diff.revisionID !== review.diff.revisionID ? 'Older revision; source was not retargeted.' : 'Matches displayed source.' }}</p>
     </header>
-    <div v-if="review" class="semantic-layout">
-      <nav class="semantic-groups" aria-label="Semantic groups"><UiButton v-for="item in review.groups" :key="item.groupID" variant="quiet" :aria-current="selected === item.groupID ? 'page' : undefined" @click="selected = item.groupID">{{ item.title }} · {{ item.ranges.length }} ranges</UiButton><UiButton variant="quiet" :aria-current="selected === 'ungrouped' ? 'page' : undefined" @click="selected = 'ungrouped'">Ungrouped changes · {{ ungrouped.length }} changed lines</UiButton><p>{{ unsupported.length }} unsupported/non-text changes remain in Files changed. Counts describe source inventory, not semantic certainty.</p></nav>
+    <div v-if="review" class="semantic-layout" :class="{ 'groups-collapsed': !groupsOpen }">
+      <aside class="semantic-groups"><UiButton variant="quiet" :aria-expanded="groupsOpen" aria-label="Toggle semantic groups" @click="groupsOpen = !groupsOpen">{{ groupsOpen ? '‹ Groups' : '›' }}</UiButton><div v-show="groupsOpen"><FileUnderstanding v-if="diff?.revisionID === review.diff.revisionID" :files="diff.files" :understood="understood ?? {}" /><nav aria-label="Semantic groups"><UiButton v-for="item in review.groups" :key="item.groupID" variant="quiet" :aria-current="selected === item.groupID ? 'page' : undefined" :title="item.title" @click="selected = item.groupID">{{ item.title }} · {{ new Set(item.ranges.map((range): string => range.fileID)).size }} files</UiButton><UiButton variant="quiet" :aria-current="selected === 'ungrouped' ? 'page' : undefined" @click="selected = 'ungrouped'">Ungrouped changes · {{ ungrouped.length }} changed lines</UiButton><p>{{ unsupported.length }} unsupported/non-text changes remain in Files changed. Counts describe source inventory, not semantic certainty.</p></nav></div></aside>
       <section class="semantic-excerpts" tabindex="0" aria-label="Grouped source excerpts">
         <h3>{{ group?.title ?? 'Ungrouped changes' }}</h3><p v-if="group">{{ group.explanation }}</p><p v-if="!current.length">No ungrouped text changes.</p>
         <article v-for="(anchor, index) in current" :key="`${anchor.fileID}-${anchor.hunkID}-${anchor.side}-${anchor.start}`" class="semantic-excerpt" :aria-label="`${path(anchor)} ${anchor.side} lines ${anchor.start}–${anchor.end}`">
-          <h4>{{ path(anchor) }} · {{ anchor.side === 'old' ? 'merge base' : 'head' }} L{{ anchor.start }}–{{ anchor.end }}</h4>
+          <header class="excerpt-header"><h4>{{ path(anchor) }} · {{ anchor.side === 'old' ? 'merge base' : 'head' }} L{{ anchor.start }}–{{ anchor.end }}</h4><UiButton v-if="diff?.revisionID === review.diff.revisionID" variant="quiet" :aria-pressed="understood?.[anchor.fileID] === true" :aria-label="`${understood?.[anchor.fileID] ? 'Unmark understood' : 'Mark understood'} ${path(anchor)}`" @click="emit('understood', anchor.fileID)">{{ understood?.[anchor.fileID] ? '✓ Understood' : '○ Mark understood' }}</UiButton></header>
           <p>Excerpt {{ index + 1 }} · original revision {{ review.diff.revisionID.slice(0, 8) }}. Separate ranges are not contiguous code.</p>
           <SourceDiff :lines="lines(anchor)" :label="path(anchor)" :selection="selectedRange(anchor)" :highlight="false" :selectable="canNavigate(anchor)" real @select="(side, line, extend): void => selectLine(anchor, side, line, extend)" />
           <div class="semantic-actions"><UiButton variant="quiet" :disabled="!canNavigate(target(anchor))" @click="navigate(anchor, false)">View in original diff</UiButton><UiButton variant="quiet" :disabled="!canNavigate(target(anchor))" @click="navigate(anchor, true)">Ask about selected range</UiButton></div>
@@ -220,12 +222,16 @@ onUnmounted(reset)
 .semantic-header, .semantic-footer { padding: var(--space-4) var(--space-6); overflow-wrap: anywhere; }
 .semantic-header > * + * { margin-top: var(--space-3); }
 .semantic-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.semantic-layout { display: grid; grid-template-columns: 15.75rem minmax(0, 1fr); gap: var(--space-6); padding: var(--space-4) var(--space-6); min-height: 14rem; flex: 1; overflow: hidden; }
+.semantic-layout { display: grid; grid-template-columns: var(--width-file-rail) minmax(0, 1fr); gap: 0; min-height: 14rem; flex: 1; overflow: hidden; }
+.semantic-layout.groups-collapsed { grid-template-columns: 2.5rem minmax(0, 1fr); }
 .semantic-groups { overflow: auto; min-height: 0; }
 .semantic-groups .ui-button { width: 100%; white-space: normal; text-align: left; margin-bottom: var(--space-2); }
 .semantic-groups [aria-current] { background: var(--color-accent-soft); border-color: var(--color-accent); }
 .semantic-excerpts { overflow: auto; min-width: 0; overflow-wrap: anywhere; }
-.semantic-excerpt { margin-top: var(--space-4); padding: var(--space-3); background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius-panel); min-width: 0; }
+.semantic-excerpt { margin-top: var(--space-4); background: var(--color-panel); border-block: 1px solid var(--color-border); min-width: 0; }
+.excerpt-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding-inline: var(--space-3); min-height: 2rem; background: var(--color-surface); }
+.excerpt-header h4 { flex: 1; }
+.excerpt-header .ui-button { font-size: var(--text-small); padding-block: 0; }
 .semantic-excerpt h4 { font-family: var(--font-code); font-size: var(--text-small); }
 .semantic-excerpt p { margin-block: var(--space-2); }
 .semantic-footer { color: var(--color-muted); font-size: var(--text-small); }

@@ -15,7 +15,7 @@ test('keyboard users can skip directly to the labeled workspace content', async 
   await expect(page.getByRole('main')).toBeFocused()
 })
 
-test('uses local Slate typography, foundation geometry and bundled licenses', async ({ page }) => {
+test('uses local typography, reference geometry and bundled licenses', async ({ page }) => {
   await expect(page.getByText('UI preview', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'UI preview', exact: true }).click()
   await expect(page.getByText('No PR loaded. No agent connected.', { exact: false })).toBeVisible()
@@ -33,7 +33,7 @@ test('uses local Slate typography, foundation geometry and bundled licenses', as
   })
   expect(typography).toMatchObject({
     size: '13px',
-    background: 'rgb(22, 26, 34)',
+    background: 'rgb(17, 18, 20)',
     ligatures: 'none',
     synthesis: 'none',
     loaded: true,
@@ -49,12 +49,12 @@ test('uses local Slate typography, foundation geometry and bundled licenses', as
   )
   await expect(page.locator('.line-number').first()).toHaveCSS('font-size', '11px')
   const rail = await page.getByRole('complementary', { name: 'Changed files' }).boundingBox()
-  expect(rail?.width).toBeCloseTo(240, 0)
+  expect(rail?.width).toBeCloseTo(190, 0)
   await openSampleThread(page)
   const conversation = await page
     .getByRole('complementary', { name: 'Question 01', exact: true })
     .boundingBox()
-  expect(conversation?.width).toBeCloseTo(440, 0)
+  expect(conversation?.width).toBeCloseTo(350, 0)
   await expect(page.locator('.sample-explanation:visible')).toHaveCSS('font-size', '14px')
   await expect(page.locator('.sample-explanation:visible')).toHaveCSS('line-height', '24.5px')
   await expect(page.locator('.sample-prompt:visible')).toHaveCSS('font-size', '15px')

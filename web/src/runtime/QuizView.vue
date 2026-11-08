@@ -16,6 +16,7 @@ const status = shallowRef<QuizStatus | null>(null)
 const selections = ref<Record<string, string>>({})
 const checks = shallowRef<Record<string, QuizChecked>>({})
 const position = ref(0)
+const results = ref(false)
 const reading = ref(false)
 const sending = ref(false)
 const cancelling = ref(false)
@@ -56,6 +57,7 @@ function reset(): void {
   selections.value = {}
   checks.value = {}
   position.value = 0
+  results.value = false
   reading.value = false
   sending.value = false
   cancelling.value = false
@@ -131,6 +133,7 @@ async function refresh(): Promise<void> {
       selections.value = {}
       checks.value = {}
       position.value = 0
+      results.value = false
     }
     saved.value = result
     needsRead.value = false
@@ -234,6 +237,7 @@ async function go(index: number): Promise<void> {
   const scope = epoch
   const quizID = quiz.value.quizID
   const trigger = document.activeElement
+  results.value = false
   position.value = index
   await nextTick()
   if (props.active && scope === epoch && quiz.value?.quizID === quizID && position.value === index && (document.activeElement === trigger || document.activeElement === document.body)) legend.value?.focus()
@@ -259,6 +263,15 @@ function navigable(quote: QuizEvidence): boolean {
   return !!hunk && quote.selected.every((line: SourceLine): boolean => hunk.lines.some((actual: SourceLine): boolean => actual.id === line.id && actual.text === line.text && actual.oldLine === line.oldLine && actual.newLine === line.newLine))
 }
 
+/** Restarts only page-memory practice, never generation or saved quiz mutation. */
+async function retryPractice(): Promise<void> {
+  if (checking.value || reading.value || sending.value) return
+  selections.value = {}
+  checks.value = {}
+  results.value = false
+  await go(0)
+}
+
 watch((): readonly [string, RuntimeClient | null] => [props.prID, props.client], (): void => { reset(); if (props.active) void refresh() }, { flush: 'sync' })
 watch((): boolean => props.active, (active: boolean): void => {
   if (active) void refresh()
@@ -282,31 +295,32 @@ onUnmounted(reset)
       <p v-if="sending" role="status">Requesting generation admission… This is not saved completion.</p>
       <p v-if="error" role="alert">{{ error }}</p>
       <p v-if="!diff">Load pinned source in Files changed to generate a quiz. Saved questions and checks need no source loading.</p>
-      <div v-if="confirming" class="quiz-confirm" role="group" aria-label="Confirm quiz regeneration"><p>Replace the saved quiz with five new questions for the displayed source? The previous set and your selections remain until a complete replacement is saved.</p><UiButton :disabled="unavailable" @click="generate">Generate replacement</UiButton><UiButton @click="confirming = false">Keep current quiz</UiButton></div>
+      <div v-if="confirming" class="quiz-confirm" role="group" aria-label="Confirm quiz regeneration"><p>Replace the saved quiz with new questions for the displayed source? The previous set and your selections remain until a complete replacement is saved.</p><UiButton :disabled="unavailable" @click="generate">Generate replacement</UiButton><UiButton @click="confirming = false">Keep current quiz</UiButton></div>
       <div v-if="status" class="generation-status" role="status"><p>Generation: {{ status.state }}{{ status.cancelRequested ? ' · Cancellation requested; idle or rollback is not guaranteed.' : '' }}</p><p v-if="status.state === 'completed'">Saving acknowledged for version {{ status.savedVersion }}. The saved read below identifies the displayed set.</p><p v-if="status.state === 'failed'">Generation did not acknowledge a saved replacement ({{ status.failureCode }}). Read saved state before retrying uncertain work.</p><p v-if="status.state === 'cancelled'">Generation cancelled. The previously saved set is retained.</p><p v-if="status.executionUnknown">Execution is uncertain. Do not resend; generation remains blocked in this runtime.</p><UiButton v-if="working" :disabled="cancelling || status.cancelRequested || needsRead || status.state === 'saving'" @click="cancel">{{ cancelling ? 'Requesting cancellation…' : 'Cancel generation' }}</UiButton><p v-if="working">Accepted work belongs to the app and may continue when you leave this view or disconnect.</p></div>
       <template v-if="quiz && question">
         <p class="quiz-revision">Saved version {{ saved?.version }} · {{ quiz.revision.baseBranch }} · {{ quiz.revision.mergeBaseSHA.slice(0, 8) }} → {{ quiz.revision.headSHA.slice(0, 8) }}</p>
         <p v-if="outdated" role="status">Older revision: this quiz does not match the displayed source. Checks still use its original saved key.</p><p v-else-if="!diff">Original revision retained; currentness is unverified until source is loaded.</p>
-        <div class="quiz-progress"><nav aria-label="Quiz questions"><UiButton v-for="(q, index) in quiz.questions" :key="q.questionID" :aria-current="position === index ? 'step' : undefined" :aria-label="`Quiz question ${index + 1}, ${checks[q.questionID] ? 'checked' : 'not checked'}`" @click="go(index)">{{ index + 1 }}</UiButton></nav><p>{{ count }} of 5 checked in this page</p></div>
-        <form class="quiz-question" aria-label="Check quiz answer" @submit.prevent="check">
-          <p>Question {{ position + 1 }} / 5 · Single answer</p>
+        <div class="quiz-progress"><nav aria-label="Quiz questions"><UiButton v-for="(q, index) in quiz.questions" :key="q.questionID" :aria-current="position === index ? 'step' : undefined" :aria-label="`Quiz question ${index + 1}, ${checks[q.questionID] ? 'checked' : 'not checked'}`" @click="go(index)">{{ index + 1 }}</UiButton></nav><p>{{ count }} of {{ quiz.questions.length }} checked in this page</p></div>
+        <section v-if="results" aria-label="Quiz results" class="quiz-results"><h3>Practice results</h3><p>{{ Object.values(checks).filter((answer): boolean => answer.correct).length }} / {{ quiz.questions.length }} matched the saved key.</p><p>Practice feedback only, not PR approval or proof of understanding. Attempts are not saved.</p><UiButton :disabled="!!checking || reading || sending" @click="retryPractice">Try again</UiButton></section>
+        <form v-else class="quiz-question" aria-label="Check quiz answer" @submit.prevent="check">
+          <p>Question {{ position + 1 }} / {{ quiz.questions.length }} · Single answer</p>
           <fieldset :key="`${quiz.quizID}-${position}`" :aria-describedby="`${id}-check-hint`"><legend ref="legend" tabindex="-1">{{ question.prompt }}</legend>
             <label v-for="c in question.choices" :key="c.choiceID" class="quiz-option" :class="{ 'is-selected': selected === c.choiceID, 'is-correct': checked?.correctChoiceID === c.choiceID, 'is-wrong': checked && !checked.correct && selected === c.choiceID }"><input type="radio" :name="`${id}-${question.questionID}`" :value="c.choiceID" :checked="selected === c.choiceID" :aria-disabled="!!checked || checking === question.questionID || undefined" @change="choose(c.choiceID)" @click="(checked || checking === question.questionID) && $event.preventDefault()" @keydown="guardRadio" /><span>{{ c.choiceID.toUpperCase() }}</span><span class="quiz-copy">{{ c.text }}</span><span v-if="checked?.correctChoiceID === c.choiceID">✓ Correct answer{{ selected === c.choiceID ? ' · Your answer' : '' }}</span><span v-else-if="checked && selected === c.choiceID">× Your answer</span></label>
           </fieldset>
           <p :id="`${id}-check-hint`">{{ checked ? 'Your checked selection is read-only in this page.' : 'Select one alternative, then Check answer. Selection alone reveals no solution.' }}</p>
           <p v-if="checked" role="status">{{ checked.correct ? 'Matches the saved agent-generated key.' : 'Incorrect against the saved key. Your selected answer is retained.' }}</p>
-          <div class="quiz-actions"><UiButton :disabled="position === 0" @click="go(position - 1)">Previous</UiButton><UiButton v-if="!checked" type="submit" variant="primary" :disabled="!selected || !!checking || reading || needsRead || !client">{{ checking ? 'Checking…' : 'Check answer' }}</UiButton><UiButton :disabled="position === 4" @click="go(position + 1)">Next question</UiButton></div>
+          <div class="quiz-actions"><UiButton :disabled="position === 0" @click="go(position - 1)">Previous</UiButton><UiButton v-if="!checked" type="submit" variant="primary" :disabled="!selected || !!checking || reading || needsRead || !client">{{ checking ? 'Checking…' : 'Check answer' }}</UiButton><UiButton v-if="position < quiz.questions.length - 1" @click="go(position + 1)">Next question</UiButton><UiButton v-else :disabled="count !== quiz.questions.length" @click="results = true">See results</UiButton></div>
         </form>
       </template>
-      <div v-else-if="saved && !reading" class="quiz-empty"><h3>No saved quiz</h3><p>Generate five questions explicitly from the displayed pinned source. Entering Quiz never generates automatically.</p><UiButton variant="primary" :disabled="unavailable" @click="generate">Generate quiz</UiButton></div>
+      <div v-else-if="saved && !reading" class="quiz-empty"><h3>No saved quiz</h3><p>Generate questions explicitly from the displayed pinned source. Entering Quiz never generates automatically.</p><UiButton variant="primary" :disabled="unavailable" @click="generate">Generate quiz</UiButton></div>
     </ScrollRegion>
     <aside class="quiz-explanation" aria-label="Quiz answer explanation"><h2>{{ checked ? 'Answer explanation' : 'Before you check' }}</h2><ScrollRegion label="Quiz explanation and original evidence" class="explanation-body"><template v-if="checked"><p>Agent-generated explanation · Verify against the original source.</p><p class="explanation-text">{{ checked.explanation }}</p><section v-for="(quote, index) in checked.evidence" :key="index" class="quiz-evidence"><h3>{{ quote.newPath ?? quote.oldPath }} · {{ quote.anchor.side }} {{ quote.anchor.start }}–{{ quote.anchor.end }}</h3><SourceDiff :lines="lines(quote)" label="Original quiz evidence" :selection="null" :selectable="false" /><UiButton :disabled="!navigable(quote)" @click="emit('source', quote, checked.revisionID)">View in original diff</UiButton><p v-if="!navigable(quote)">Original source navigation unavailable. Load the matching revision and finish or discard any pinned source draft; this quote remains readable.</p></section></template><p v-else>The saved key, explanation and source evidence are withheld until an explicit answer check. Selecting or navigating questions does not check an answer.</p></ScrollRegion></aside>
   </section>
 </template>
 
 <style scoped>
-.real-quiz { container: real-quiz / inline-size; display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 27.5rem); gap: var(--space-5); flex: 1; min-height: 0; min-width: 0; }
-.quiz-main { padding: var(--space-3) var(--space-2); }
+.real-quiz { container: real-quiz / inline-size; display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, var(--width-conversation)); gap: 0; flex: 1; min-height: 0; min-width: 0; }
+.quiz-main { padding: var(--space-6); }
 .quiz-main p, .explanation-body p { margin-block: var(--space-3); overflow-wrap: anywhere; }
 .quiz-heading, .quiz-actions, .quiz-progress, .quiz-progress nav { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .quiz-heading, .quiz-progress { justify-content: space-between; }

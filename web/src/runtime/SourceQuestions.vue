@@ -8,7 +8,7 @@ import type { RuntimeClient } from './client'
 import type { PinnedDiff, SourceFile } from './source'
 import { questionError, QuestionAdmissionError, sameAnchor, type InitialQuestion, type QuestionAnchor, type QuestionAnswer } from './questions'
 
-const props = defineProps<{ diff: PinnedDiff; file: SourceFile; lines: DiffLine[]; client: RuntimeClient; sourcePending: boolean; busyReason: string; markers: { answer: QuestionAnswer; anchor: QuestionAnchor }[] }>()
+const props = defineProps<{ diff: PinnedDiff; file: SourceFile; lines: DiffLine[]; client: RuntimeClient; sourcePending: boolean; selectionBlocked?: boolean; busyReason: string; markers: { answer: QuestionAnswer; anchor: QuestionAnchor }[] }>()
 const emit = defineEmits<{ guard: [active: boolean]; sending: [pending: boolean]; admitted: [answer: QuestionAnswer, input: InitialQuestion]; open: [answer: QuestionAnswer, trigger: HTMLElement] }>()
 const anchor = ref<QuestionAnchor | null>(null)
 const draft = ref<InitialQuestion | null>(null)
@@ -19,6 +19,7 @@ const uncertain = ref(false)
 const error = ref('')
 const message = ref('')
 const root = ref<HTMLElement>()
+const inlineThreads = ref<string[]>([])
 let controller: AbortController | undefined
 let trigger: HTMLElement | null = null
 let pivot = 0
@@ -49,6 +50,7 @@ function endpoint(target: QuestionAnchor | null): string | undefined {
  * @param extend Whether to extend from the original keyboard/pointer pivot.
  */
 function selectLine(side: 'base' | 'head', line: number, extend: boolean): void {
+  if (props.selectionBlocked) { message.value = 'Resume or discard the pinned draft in its original file before changing the selection.'; return }
   const row = props.lines.find((item): boolean => item[side] === line)
   if (!row?.hunkID) return
   const old = anchor.value
@@ -76,7 +78,7 @@ async function ask(event: MouseEvent): Promise<void> {
  * @param origin Surviving control used for focus restoration.
  */
 async function openDraft(origin: HTMLElement | null): Promise<void> {
-  if (props.sourcePending || pending.value) return
+  if (props.sourcePending || props.selectionBlocked || pending.value) return
   trigger = origin
   if (!draft.value && anchor.value) draft.value = { revision: { ...props.diff.revision }, anchor: { ...anchor.value }, question: '' }
   if (!draft.value) return
@@ -100,13 +102,20 @@ async function selectRange(target: QuestionAnchor, compose: boolean): Promise<vo
   root.value?.querySelector<HTMLElement>(`[data-line="${target.start}"][data-side="${target.side === 'old' ? 'base' : 'head'}"]`)?.scrollIntoView({ block: 'center' })
   if (compose) await openDraft(root.value?.querySelector<HTMLElement>('[data-ask]') ?? null)
 }
-defineExpose({ selectRange })
+/** Reveals the existing inline view without dispatching or duplicating a thread.
+ * @param threadID Canonical retained thread.
+ */
+function showInline(threadID: string): void {
+  if (!inlineThreads.value.includes(threadID)) inlineThreads.value.push(threadID)
+}
+defineExpose({ selectRange, showInline })
 
 /**
  * Selects a whole counted unified hunk without guessing a file-wide anchor.
  * @param hunkID Immutable hunk identity.
  */
 function selectHunk(hunkID: string): void {
+  if (props.selectionBlocked) { message.value = 'Resume or discard the pinned draft in its original file first.'; return }
   if (draft.value) { message.value = 'Resume or discard the pinned draft before changing the selection.'; return }
   anchor.value = { kind: 'hunk', fileID: props.file.id, hunkID }
   message.value = ''
@@ -150,6 +159,7 @@ async function submit(): Promise<void> {
   try {
     const answer = await client.askQuestion(input.revision.prID, input, current.signal)
     if (current.signal.aborted || controller !== current || props.client !== client || props.diff.revisionID !== revisionID || props.file.id !== fileID) return
+    inlineThreads.value.push(answer.threadID)
     emit('admitted', answer, input)
     draft.value = null
     text.value = ''
@@ -181,10 +191,10 @@ watch((): string => props.file.id, (): void => { anchor.value = null; message.va
 <template>
   <div ref="root" class="source-questions">
     <div class="question-selection" aria-label="Question source selection">
-      <p>Select line numbers (Shift to extend), or choose a hunk. Selecting text remains native copy; only Send question starts inference.</p>
+      <details class="selection-help"><summary>Selection help</summary><p>Select line numbers (Shift to extend), or choose a hunk. Selecting text remains native copy; only Send question starts inference.</p></details>
       <div class="hunk-actions"><UiButton v-for="(hunk, index) in file.hunks" :key="hunk.id" variant="quiet" :aria-pressed="anchor?.hunkID === hunk.id && anchor.kind === 'hunk'" @click="selectHunk(hunk.id)">Select hunk {{ index + 1 }}</UiButton></div>
       <p v-if="anchor">{{ context }}</p>
-      <UiButton data-ask :disabled="(!anchor && !draft) || sourcePending || pending" @click="ask">{{ draft ? 'Resume draft' : 'Ask about selection' }}</UiButton>
+      <UiButton data-ask :disabled="(!anchor && !draft) || selectionBlocked || sourcePending || pending" @click="ask">{{ draft ? 'Resume draft' : 'Ask about selection' }}</UiButton>
       <UiButton v-if="draft" variant="quiet" :disabled="pending" @click="discard">Discard draft</UiButton>
       <p v-if="draft && !opened" role="status">Draft retained for the pinned selection. Resume or discard it before navigating.</p>
       <p v-if="message" role="status">{{ message }}</p>
@@ -193,7 +203,11 @@ watch((): string => props.file.id, (): void => { anchor.value = null; message.va
       <template #inline="{ lineId }">
         <InlineQuestionComposer v-if="draft && opened && inlineID === lineId" v-model="text" :context="context" :error="error" :pending="pending" :busy="false" :unavailable-reason="uncertain ? 'Admission is uncertain. Sending again is disabled to avoid duplicate execution.' : pending ? undefined : busyReason || undefined" heading="Ask about this pinned selection" real @submit="submit" @cancel="cancel" />
         <div v-if="markers.some((marker): boolean => endpoint(marker.anchor) === lineId)" class="question-markers" aria-label="Questions at this selection">
-          <UiButton v-for="marker in markers.filter((item): boolean => endpoint(item.anchor) === lineId)" :key="marker.answer.answerID" :data-answer="marker.answer.answerID" variant="quiet" @click="emit('open', marker.answer, $event.currentTarget as HTMLElement)">Question · {{ marker.anchor.kind === 'hunk' ? 'hunk' : `${marker.anchor.side === 'old' ? 'merge base' : 'head'} L${marker.anchor.start}–${marker.anchor.end}` }} · {{ marker.answer.question }}</UiButton>
+          <div v-for="marker in markers.filter((item): boolean => endpoint(item.anchor) === lineId)" :key="marker.answer.answerID" class="inline-thread">
+            <UiButton :data-answer="marker.answer.answerID" variant="quiet" @click="emit('open', marker.answer, $event.currentTarget as HTMLElement)">Question · {{ marker.anchor.kind === 'hunk' ? 'hunk' : `${marker.anchor.side === 'old' ? 'merge base' : 'head'} L${marker.anchor.start}–${marker.anchor.end}` }} · {{ marker.answer.question }}</UiButton>
+            <UiButton variant="quiet" :aria-expanded="inlineThreads.includes(marker.answer.threadID)" @click="inlineThreads = inlineThreads.includes(marker.answer.threadID) ? inlineThreads.filter((id): boolean => id !== marker.answer.threadID) : [...inlineThreads, marker.answer.threadID]">{{ inlineThreads.includes(marker.answer.threadID) ? 'Hide inline' : 'Show inline' }}</UiButton>
+            <div v-if="inlineThreads.includes(marker.answer.threadID)"><slot name="conversation" :answer="marker.answer" /></div>
+          </div>
         </div>
       </template>
     </SourceDiff>
@@ -206,4 +220,7 @@ watch((): string => props.file.id, (): void => { anchor.value = null; message.va
 .question-selection > * + * { margin-top: var(--space-2); }
 .hunk-actions, .question-markers { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .question-markers .ui-button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.inline-thread { width: 100%; min-width: 0; }
+.selection-help { color: var(--color-muted); }
+.selection-help summary { cursor: pointer; }
 </style>

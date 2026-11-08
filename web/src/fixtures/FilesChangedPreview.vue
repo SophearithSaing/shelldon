@@ -124,6 +124,7 @@ async function focusDraft(): Promise<void> {
  * @param change Destination file/range or recovered draft.
  */
 async function applyChange(change: Change): Promise<void> {
+  const previousFile = file.value
   file.value = change.fileId
   selection.value = change.range
   origin.value = change.origin ?? change.range?.start ?? 0
@@ -134,6 +135,10 @@ async function applyChange(change: Change): Promise<void> {
   if (recovered && expanded.value !== null) selection.value = recovered.anchor.range
   pendingChange.value = null
   await nextTick()
+  if (previousFile !== change.fileId) {
+    const section = Array.from(root.value?.querySelectorAll<HTMLElement>('[data-preview-file]') ?? []).find((element): boolean => element.dataset.previewFile === change.fileId)
+    section?.scrollIntoView({ block: 'start' })
+  }
   if (change.compose) await ask(change.range === null)
   else if (change.draftId !== undefined) await focusDraft()
   if (change.revealId !== undefined || change.sourceOnly) {
@@ -358,11 +363,16 @@ defineExpose({ selectFile, revealSource, revealAnchor })
       <UiButton @click="confirmChange(true)">Discard draft and switch</UiButton>
     </section>
     <ScrollRegion label="Sample code diff" class="diff-scroll">
-      <article class="diff-card" :aria-label="selectedFile.path">
+      <template v-for="entry in sampleFiles" :key="entry.id">
+      <article v-if="entry.id !== file" class="diff-card" :data-preview-file="entry.id" :aria-label="entry.path">
+        <header class="diff-head"><h2>{{ entry.path }}</h2><label class="viewed-check"><input type="checkbox" :aria-label="`Mark understood ${entry.path}`" :checked="viewed[entry.id]" @change="emit('viewed', entry.id, ($event.target as HTMLInputElement).checked)" />Understood</label><UiButton variant="quiet" @click="selectFile(entry.id)">Review this file</UiButton></header>
+        <SourceDiff :lines="sampleDiffs[entry.id] ?? []" :label="`Sample source ${entry.path}`" :selection="null" :selectable="false" :highlight="entry.id !== 'docs'" />
+      </article>
+      <article v-else class="diff-card" :data-preview-file="file" :aria-label="selectedFile.path">
         <header class="diff-head">
           <h2>{{ selectedFile.path }}</h2>
           <span class="additions">+{{ selectedFile.added }}</span><span class="deletions">−{{ selectedFile.removed }}</span>
-          <label class="viewed-check"><input type="checkbox" :checked="viewed[file]" @change="emit('viewed', file, ($event.target as HTMLInputElement).checked)" />Viewed</label>
+          <label class="viewed-check"><input type="checkbox" :checked="viewed[file]" @change="emit('viewed', file, ($event.target as HTMLInputElement).checked)" />Understood</label>
         </header>
         <InlineQuestionComposer v-if="draft && !draft.anchor.range" v-model="draft.text" :context="context(draft.anchor)" :error="draft.error" :pending="pending" :busy="revisionBusy" @submit="submit" @cancel="cancel" @finish="complete" />
         <button v-for="thread in fileThreads.filter((item) => !item.anchor.range)" :key="thread.id" class="question-marker" :data-thread-id="thread.id" :aria-label="`Open sample question ${thread.id}`" @click="openThread(thread, $event)">Question {{ thread.id }} · {{ thread.question }} →</button>
@@ -374,6 +384,7 @@ defineExpose({ selectFile, revealSource, revealAnchor })
         </template>
         <footer class="diff-bottom"><span>{{ fileThreads.length ? `${fileThreads.length} sample questions in this file` : 'No submitted sample questions yet' }}</span><UiButton data-file-ask variant="quiet" @click="ask(true)">Ask about this file ↗</UiButton></footer>
       </article>
+      </template>
       <details class="preview-tools">
         <summary>Sample preview controls</summary>
         <p>Source excerpts and file totals are illustrative, not a fetched complete PR. Preview creation adds one local thread, not a native session or saved conversation.</p>
@@ -399,8 +410,8 @@ defineExpose({ selectFile, revealSource, revealAnchor })
 .diff-display [aria-disabled] { cursor: not-allowed; }
 .selection-actions { flex-wrap: wrap; padding-bottom: var(--space-2); font-size: var(--text-code-meta); color: var(--color-muted); }
 .diff-scroll { flex: 1; min-height: 0; }
-.diff-card { overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-panel); }
-.diff-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-height: 4rem; padding: var(--space-2) 1.125rem; border-bottom: 1px solid var(--color-border); }
+.diff-card { border-bottom: 1rem solid var(--color-canvas); background: var(--color-panel); }
+.diff-head { position: sticky; top: 0; z-index: 1; background: var(--color-surface); display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-height: 2rem; padding: 0 var(--space-3); border-bottom: 1px solid var(--color-border); }
 .diff-head h2 { min-width: 0; font: 500 var(--text-code-meta) var(--font-code); overflow-wrap: anywhere; }
 .additions { color: var(--color-success); font-size: var(--text-code-meta); }
 .deletions { color: var(--color-error); font-size: var(--text-code-meta); }

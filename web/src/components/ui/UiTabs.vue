@@ -71,10 +71,10 @@ function navigate(event: KeyboardEvent, index: number): void {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 2.8125rem;
+  min-height: var(--target-control);
   min-width: var(--target-control);
   font-size: var(--text-prose);
-  padding: var(--space-2) var(--space-1);
+  padding: var(--space-1);
   color: var(--color-muted);
   border: 0;
   border-bottom: 2px solid transparent;

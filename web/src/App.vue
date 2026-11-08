@@ -10,7 +10,7 @@ const reviewID = parseReviewID(location.pathname)
 const reviewState = ref<ReviewState>({ status: 'disconnected' })
 const client = shallowRef<RuntimeClient | null>(null)
 const samples = import.meta.env.MODE === 'fixture' || new URLSearchParams(location.search).has('preview')
-const runtimeExpanded = ref(false)
+const runtimeExpanded = ref(!samples)
 const runtimeState = ref('Disconnected')
 const protectQuestions = ref(false)
 const runtimeLabel = import.meta.env.DEV ? 'Development backend' : 'Local runtime'

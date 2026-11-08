@@ -102,7 +102,7 @@ test('mark understood updates only its thread and offers undo and reopen', async
   await page.getByRole('button', { name: 'Reopen question', exact: true }).click()
   await expect(filters.getByRole('button', { name: 'Understood', exact: true })).toHaveText('Understood 0')
   await page.getByRole('tab', { name: 'Files changed', exact: true }).click()
-  await expect(page.getByRole('checkbox', { name: 'Viewed', exact: true })).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Understood', exact: true })).not.toBeChecked()
   await expect(page.getByRole('tab', { name: 'Questions', exact: true })).toHaveAttribute('aria-description', '4 sample items')
 })
 

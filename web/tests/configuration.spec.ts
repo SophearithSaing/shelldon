@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }): Promise<void> => {
 test('configuration uses three illustrative rows and tracks changes without saving', async ({ page }, testInfo): Promise<void> => {
   await expect(page.getByRole('combobox')).toHaveCount(3)
   expect((await page.locator('.configuration-content').boundingBox())!.width).toBe(1024)
-  expect((await page.locator('.application-header').boundingBox())!.height).toBe(48)
+  expect((await page.locator('.application-header').boundingBox())!.height).toBe(40)
   await expect(page.locator('.workspace-summary:visible')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Save changes — unavailable' })).toBeDisabled()
   await page.screenshot({ path: testInfo.outputPath('configuration-clean-1440.png'), fullPage: true })

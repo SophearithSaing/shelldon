@@ -21,7 +21,7 @@ test('one submission creates one thread and reopening never increments counts', 
   await expect(page.getByText('Enter a question before previewing thread creation.')).toBeVisible()
   await openSampleThread(page)
   await expect(page.getByRole('tab', { name: 'Questions', exact: true })).toHaveAttribute('aria-description', '1 sample items')
-  await expect(page.getByRole('checkbox', { name: 'Viewed', exact: true })).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Understood', exact: true })).not.toBeChecked()
   await page.getByRole('button', { name: 'Close conversation', exact: true }).click()
   const marker = page.getByRole('button', { name: 'Open sample question 1', exact: true })
   await expect(marker).toBeFocused()
