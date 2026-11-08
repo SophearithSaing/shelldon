@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import UiButton from './ui/UiButton.vue'
+import BrandLogo from './BrandLogo.vue'
+import ThemeToggle from './ThemeToggle.vue'
 
 defineProps<{
   current: string
@@ -33,7 +35,7 @@ defineExpose({ focusDestination })
       aria-label="Sheldon — All PRs"
       @click="emit('navigate', 'library', $event)"
     >
-      <span class="brand-mark" aria-hidden="true">S.</span><span class="brand-name">Sheldon</span>
+      <BrandLogo />
     </a>
     <a
       class="all-prs"
@@ -77,6 +79,7 @@ defineExpose({ focusDestination })
       @click="emit('navigate', 'config', $event)"
     ><span aria-hidden="true">⚙</span><span class="configuration-text">Configuration</span></a>
     <slot name="tools" />
+    <ThemeToggle />
   </header>
 </template>
 
@@ -85,8 +88,8 @@ defineExpose({ focusDestination })
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 3rem;
-  padding-inline: var(--space-6);
+   min-height: 2.5rem;
+   padding-inline: var(--space-4);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-canvas);
 }

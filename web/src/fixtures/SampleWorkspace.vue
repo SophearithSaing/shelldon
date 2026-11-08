@@ -216,12 +216,12 @@ function selectFile(id: string): void {
           <template v-else>Deduplicate concurrent session refreshes</template>
           <span class="muted"> #{{ workspaceNumber }} · sample PR</span>
         </h1>
-        <div class="fixture-meta">
+         <details class="fixture-meta"><summary>PR details</summary>
           <span>Sample source</span>
           <code class="context-chip">fix/session-refresh → main</code>
           <span>Sample revision <code>a81c2f4</code></span>
           <span class="muted">Nothing is posted to GitHub.</span>
-        </div>
+         </details>
         <UiButton class="github-sample" disabled :aria-describedby="`${tabsId}-github-unavailable`">
           Open in GitHub <span aria-hidden="true">↗</span>
         </UiButton>
@@ -321,7 +321,7 @@ function selectFile(id: string): void {
 .fixture-meta {
   font-size: var(--text-small);
 }
-.github-sample { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+.github-sample { grid-column: 3; grid-row: 1; align-self: center; }
 .fixture-meta code {
   font-size: var(--text-code-meta);
 }

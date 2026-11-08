@@ -63,12 +63,13 @@ async function closeConversation(): Promise<void> {
             <summary aria-label="Changed files">
               <span aria-hidden="true">☷</span>
               <span class="files-title">Changed files</span>
-              <span class="files-chevron" aria-hidden="true">‹</span>
+               <span class="files-chevron" aria-hidden="true">‹</span>
             </summary>
             <div class="files-body" role="region" aria-label="Changed file list" tabindex="0">
               <slot name="files" />
             </div>
-          </details>
+           </details>
+           <div class="rail-progress"><slot name="progress" /></div>
         </aside>
         <main :id="`${id}-content`" ref="content" class="workspace-content" tabindex="-1">
           <slot :open-conversation="openConversation" />
@@ -84,12 +85,16 @@ async function closeConversation(): Promise<void> {
               <h2 :id="`${id}-conversation-title`" ref="conversationHeading" tabindex="-1">
                 {{ conversationTitle }}
               </h2>
-              <UiButton variant="quiet" @click="closeConversation">Close conversation</UiButton>
+               <UiButton variant="quiet" @click="closeConversation">Close conversation</UiButton>
             </div>
             <UiButton class="pane-return" @click="closeConversation">Back to workspace</UiButton>
           </header>
           <slot name="conversation" />
-        </aside>
+         </aside>
+         <aside v-show="!conversationOpen" class="conversation-rail" aria-label="Collapsed conversations">
+           <UiButton variant="quiet" aria-label="Open conversations panel" @click="openConversation">‹</UiButton>
+           <span>Conversations</span>
+         </aside>
       </div>
     </div>
   </div>
@@ -104,46 +109,49 @@ async function closeConversation(): Promise<void> {
 }
 .workspace {
   display: grid;
-  grid-template-rows: minmax(4.1875rem, auto) minmax(2.8125rem, auto) minmax(0, 1fr);
+   grid-template-rows: minmax(2.5rem, auto) minmax(2rem, auto) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
 }
 .workspace-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+   grid-template-columns: minmax(0, 1fr) auto auto;
   align-content: center;
   gap: 0.25rem;
-  padding: 0.5rem var(--space-6);
+   padding: 0.25rem var(--space-4);
   background: var(--color-canvas);
 }
-.workspace-summary :deep(.fixture-meta) { grid-column: 1; grid-row: 2; font-size: var(--text-code-meta); }
+.workspace-summary :deep(.fixture-meta) { grid-column: 2; grid-row: 1; font-size: var(--text-code-meta); position: relative; }
+.workspace-summary :deep(.fixture-meta > summary) { cursor: pointer; padding: 0.25rem var(--space-2); }
+.workspace-summary :deep(.fixture-meta[open]) { max-width: 26rem; }
+.workspace-summary :deep(h1) { font-size: var(--text-heading); }
 .workspace-navigation {
   display: flex;
   align-items: stretch;
-  padding-inline: var(--space-6);
+   padding-inline: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 .workspace-navigation :deep(.ui-tabs button) { min-height: var(--target-control); }
 .workspace-panes {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-6) var(--space-4);
+   grid-template-columns: minmax(0, 1fr) 2.5rem;
+   gap: 0;
+   padding: 0;
   min-width: 0;
   min-height: 0;
 }
 .workspace-panes:focus-visible, .files-body:focus-visible { outline-offset: -3px; }
 .has-file-rail .workspace-panes {
-  grid-template-columns: 3rem minmax(0, 1fr);
+   grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
 }
 .has-conversation .workspace-panes {
   grid-template-columns: minmax(0, 1fr) var(--width-conversation);
 }
 .has-file-rail.has-conversation .workspace-panes {
-  grid-template-columns: 3rem minmax(0, 1fr) var(--width-conversation);
+   grid-template-columns: 2.5rem minmax(0, 1fr) var(--width-conversation);
 }
 .has-file-rail:has(.file-disclosure[open]) .workspace-panes {
-  grid-template-columns: var(--width-file-rail) minmax(0, 1fr);
+   grid-template-columns: var(--width-file-rail) minmax(0, 1fr) 2.5rem;
 }
 .has-file-rail.has-conversation:has(.file-disclosure[open]) .workspace-panes {
   grid-template-columns: var(--width-file-rail) minmax(0, 1fr) var(--width-conversation);
@@ -152,7 +160,7 @@ async function closeConversation(): Promise<void> {
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--color-border);
-  padding-right: var(--space-3);
+   position: relative;
 }
 .workspace-files:has(.file-disclosure:not([open])) { padding-right: 0; }
 .file-disclosure {
@@ -191,7 +199,7 @@ async function closeConversation(): Promise<void> {
 .workspace-conversation {
   overflow: auto;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
+   border-radius: 0;
   background: var(--color-panel);
 }
 .conversation-header {
@@ -208,6 +216,10 @@ async function closeConversation(): Promise<void> {
 }
 .conversation-heading h2 { font-size: 1.0625rem; font-weight: 500; }
 .pane-return { display: none; }
+.conversation-rail { border-left: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; gap: var(--space-4); }
+.conversation-rail > span { writing-mode: vertical-rl; color: var(--color-muted); }
+.rail-progress { display: none; }
+.workspace-files:has(.file-disclosure:not([open])) .rail-progress { display: block; font-size: var(--text-code-meta); text-align: center; }
 @container workspace (max-width: 56.25rem) {
   .workspace .workspace-panes {
     display: flex;
@@ -219,7 +231,9 @@ async function closeConversation(): Promise<void> {
   .workspace-files:has(.file-disclosure:not([open])) { flex-basis: 3rem; height: 3rem; }
   .files-body { height: calc(18rem - var(--target-control)); }
   .workspace-content { flex: 0 0 38rem; }
-  .workspace-conversation { flex: 0 0 38rem; }
+   .workspace-conversation { flex: 0 0 38rem; }
+   .conversation-rail { flex-direction: row; min-height: var(--target-control); }
+   .conversation-rail > span { writing-mode: horizontal-tb; }
   .pane-return { display: inline-flex; margin-top: var(--space-2); }
 }
 </style>

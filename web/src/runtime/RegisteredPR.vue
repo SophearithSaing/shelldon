@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
 import WorkspaceShell from '../components/WorkspaceShell.vue'
+import BrandLogo from '../components/BrandLogo.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 import ChangedFileTree from '../components/ChangedFileTree.vue'
 import SourceQuestions from './SourceQuestions.vue'
 import QuestionConversation from './QuestionConversation.vue'
@@ -322,14 +324,14 @@ onUnmounted(reset)
   <div class="registered-pr">
     <a class="skip-link" :href="view === 'questions' ? '#saved-questions' : view === 'quiz' ? '#real-quiz' : view === 'semantic' ? '#real-semantic' : '#review-content'">Skip to PR content</a>
     <header class="review-header" aria-label="Sheldon navigation">
-      <a href="/" aria-label="Sheldon — Open a PR">Sheldon</a><a href="/?preview=library">Sample UI previews</a>
-      <span>Registered PR</span><OpenPR :client="client" /><slot name="runtime-trigger" />
+      <a href="/" aria-label="Sheldon — Open a PR"><BrandLogo /></a><a href="/?preview=library">Sample UI previews</a>
+      <span>Registered PR</span><OpenPR :client="client" /><slot name="runtime-trigger" /><ThemeToggle />
     </header>
     <slot name="runtime-panel" />
     <WorkspaceShell v-if="reviewState.status === 'registered' && pr" ref="workspace" v-model:conversation-open="conversationOpen" :has-file-rail="view === 'files' && !!diff && files.length > 0" conversation-title="Question conversation">
       <template #summary>
         <h1 class="pr-title">{{ pr.title ?? `Pull request #${pr.number}` }}</h1>
-        <p class="fixture-meta"><span>{{ pr.owner }}/{{ pr.repository }} #{{ pr.number }}</span> · <span>{{ pr.author ? `Author: ${pr.author}` : 'Author unavailable' }}</span><span v-if="diff"> · {{ diff.revision.baseBranch }} · {{ diff.revision.mergeBaseSHA.slice(0, 8) }} → {{ diff.revision.headSHA.slice(0, 8) }}</span></p>
+         <details class="fixture-meta"><summary>PR details</summary><p><span>{{ pr.owner }}/{{ pr.repository }} #{{ pr.number }}</span> · <span>{{ pr.author ? `Author: ${pr.author}` : 'Author unavailable' }}</span><span v-if="diff"> · {{ diff.revision.baseBranch }} · {{ diff.revision.mergeBaseSHA.slice(0, 8) }} → {{ diff.revision.headSHA.slice(0, 8) }}</span></p></details>
         <a class="github-link" :href="pr.url" target="_blank" rel="noreferrer">View on GitHub ↗</a>
       </template>
       <template #tabs>
@@ -395,17 +397,17 @@ onUnmounted(reset)
 
 <style scoped>
 .registered-pr { container: application / inline-size; display: flex; flex-direction: column; height: 100dvh; min-width: 0; overflow: auto; }
-.review-header { display: flex; align-items: center; flex-wrap: wrap; flex-shrink: 0; gap: var(--space-3); min-height: 3rem; padding-inline: var(--space-6); border-bottom: 1px solid var(--color-border); }
+.review-header { display: flex; align-items: center; flex-wrap: wrap; flex-shrink: 0; gap: var(--space-3); min-height: 2.5rem; padding-inline: var(--space-4); border-bottom: 1px solid var(--color-border); }
 .review-header > span { flex: 1; color: var(--color-muted); }
 .review-header > a { display: inline-flex; align-items: center; min-height: var(--target-control); }
 .review-header > a:first-child { font-size: 1.375rem; }
 .pr-title { grid-column: 1; font-size: var(--text-heading); font-weight: 550; line-height: 1.3; overflow-wrap: anywhere; }
 .fixture-meta { grid-column: 1; overflow-wrap: anywhere; color: var(--color-muted); }
-.github-link { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+.github-link { grid-column: 3; grid-row: 1; align-self: center; }
 .real-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .real-tabs .ui-button { min-height: var(--target-control); font-size: var(--text-small); }
 .real-tabs [aria-current] { border-bottom: 2px solid var(--color-accent); border-radius: 0; }
-.source-pane { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-panel); }
+.source-pane { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; background: var(--color-panel); }
 .revision-bar, .file-header { flex-shrink: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; }
 .revision-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); font-size: var(--text-small); }
 .revision-bar details { max-width: 100%; }
