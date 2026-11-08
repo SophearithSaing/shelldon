@@ -71,6 +71,10 @@ test('isolated release binary serves the authenticated shell, fonts and complete
   expect(sansLicenseText).toContain('SIL OPEN FONT LICENSE')
   expect(sansLicenseText.length).toBeGreaterThan(4000)
   expect(sansLicenseText).toBe(await readFile(new URL('../src/assets/fonts/DM-Sans-LICENSE.txt', import.meta.url), 'utf8'))
+  const iconLicense = await page.getByRole('link', { name: 'Material Symbols license' }).getAttribute('href')
+  const iconLicenseResponse = await page.request.get(url + iconLicense!)
+  expect(iconLicenseResponse.headers()['content-type']).toContain('text/plain')
+  expect(await iconLicenseResponse.text()).toBe(await readFile(new URL('../src/assets/material/LICENSE.txt', import.meta.url), 'utf8'))
   const draft = page.getByRole('textbox', { name: 'Your question', exact: true })
   await draft.fill('Retained through the standalone theme switch')
   for (const theme of ['light', 'dark'] as const) {

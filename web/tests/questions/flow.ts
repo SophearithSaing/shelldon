@@ -40,8 +40,10 @@ async function source(page: Page, label: string): Promise<SourceResponse> {
 async function ask(page: Page, text: string): Promise<Response> {
   const form = page.getByRole('form', { name: 'New question', exact: true })
   if (!await form.isVisible()) {
-    await page.getByRole('article', { name: 'Changed file shared.txt', exact: true }).getByRole('button', { name: 'Select head line 1', exact: true }).click()
-    await page.getByRole('article', { name: 'Changed file shared.txt', exact: true }).getByRole('button', { name: 'Ask about selection', exact: true }).click()
+    const path = await page.getByRole('navigation', { name: 'Changed file selection', exact: true }).locator('[aria-current="true"]').getAttribute('aria-label')
+    const file = page.getByRole('article', { name: `Changed file ${path}`, exact: true })
+    await file.getByRole('button', { name: 'Select head line 1', exact: true }).click()
+    await file.getByRole('button', { name: 'Ask about selection', exact: true }).click()
   }
   await page.getByRole('textbox', { name: 'Your question', exact: true }).fill(text)
   const received = response(page, '/questions')

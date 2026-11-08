@@ -271,7 +271,7 @@ export async function offlineCLI(options: { development?: boolean; questions?: b
       if (active.signalCode !== 'SIGKILL') throw new Error('Offline CLI crash did not bypass graceful shutdown.')
       return
     }
-    if (active.exitCode !== 0) throw new Error('Offline source CLI did not stop gracefully.')
+    if (active.exitCode !== 0) throw new Error(`Offline source CLI did not stop gracefully (exit ${active.exitCode}, signal ${active.signalCode}).`)
     if (current && output.replace(`API token: ${current.token}\n`, '').includes(current.token)) throw new Error('CLI output exposed its credential outside the startup line.')
     if ((await readFile(stateFile)).subarray(1).toString().trim()) throw new Error('Shutdown retained instance credentials.')
     if (current && await fetch(current.url + '/api/health', { signal: AbortSignal.timeout(1000) }).catch((): undefined => undefined)) throw new Error('Shutdown retained a listener.')

@@ -10,6 +10,7 @@ import ConfigurationPreview from './ConfigurationPreview.vue'
 import { samplePullRequests, sampleWorkspaceEntry, type QuestionSummary, type SourcePreviewState } from './library'
 import monoLicense from '../assets/fonts/OFL.txt?url'
 import sansLicense from '../assets/fonts/DM-Sans-LICENSE.txt?url'
+import iconLicense from '../assets/material/LICENSE.txt?url'
 
 const requested = new URLSearchParams(location.search).get('preview')
 const realEntryAvailable = import.meta.env.MODE !== 'fixture'
@@ -242,6 +243,7 @@ function focusContent(event: MouseEvent): void {
       <div class="preview-links">
         <a :href="monoLicense" target="_blank" rel="noopener noreferrer">JetBrains Mono license <span class="sr-only">(opens in a new tab)</span></a>
         <a :href="sansLicense" target="_blank" rel="noopener noreferrer">DM Sans license <span class="sr-only">(opens in a new tab)</span></a>
+        <a :href="iconLicense" target="_blank" rel="noopener noreferrer">Material Symbols license <span class="sr-only">(opens in a new tab)</span></a>
       </div>
     </section>
     <slot name="runtime-panel" />

@@ -104,9 +104,10 @@ func Listen(address, devOrigin string, prs PRRegistry) (*Server, error) {
 	s.mux.HandleFunc("/api/", http.NotFound)
 	s.mux.Handle("/", ui.Handler())
 	s.http = &http.Server{
-		Handler:           http.HandlerFunc(s.handle),
-		BaseContext:       func(net.Listener) context.Context { return lifetime },
-		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
+		Handler:     http.HandlerFunc(s.handle),
+		BaseContext: func(net.Listener) context.Context { return lifetime },
+		// Unused browser preconnections must drain within the CLI's three-second shutdown budget.
+		ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10,
 		// No access/request logging, and no raw request data in server error logs.
 		ErrorLog: log.New(io.Discard, "", 0),
