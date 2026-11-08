@@ -73,6 +73,8 @@ test('shortcuts respect IME and failed creation retains text without a thread', 
   await page.screenshot({ path: testInfo.outputPath('creation-error.png'), fullPage: true })
   await page.getByLabel('Preview creation outcome').filter({ visible: true }).selectOption('response-error')
   await input.press('Meta+Enter')
+  await page.getByRole('button', { name: 'Open in panel', exact: true }).click()
+  await page.getByRole('button', { name: 'Hide inline', exact: true }).click()
   await expect(page.getByRole('complementary', { name: 'Question 01', exact: true })).toContainText('Sample response failed.')
 })
 
@@ -108,7 +110,7 @@ test('draft guards, recovery and whole-file questions preserve pinned context', 
   await page.getByRole('button', { name: 'Keep draft and switch', exact: true }).click()
   await expect(page.locator('.line-source')).toContainText(['# Session refresh'])
   await expect(page.locator('.line-source img')).toHaveCount(0)
-  await expect(page.getByText('Example markup stays literal: <img src=x onerror=alert(1)>.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('article', { name: 'docs/sessions.md', exact: true }).filter({ visible: true }).getByText('Example markup stays literal: <img src=x onerror=alert(1)>.', { exact: true })).toBeVisible()
   await page.locator('summary:visible').filter({ hasText: 'Recover local drafts' }).click()
   await page.getByRole('button', { name: /Recover src\/auth\/refresh-session.ts/ }).click()
   await expect(input).toHaveValue('Retain original anchor')
@@ -117,6 +119,8 @@ test('draft guards, recovery and whole-file questions preserve pinned context', 
   await expect(input).toHaveValue('')
   await input.fill('Whole-file question')
   await input.press('Control+Enter')
+  await page.getByRole('button', { name: 'Open in panel', exact: true }).click()
+  await page.getByRole('button', { name: 'Hide inline', exact: true }).click()
   await expect(page.getByRole('complementary', { name: 'Question 01', exact: true })).toContainText('Whole file · a81c2f4')
 })
 

@@ -87,6 +87,7 @@ test('launch fragments clear before authenticated REST', async ({ page }, testIn
   await page.getByRole('button', { name: 'Disconnect backend' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Disconnected' })).toBeVisible()
   await page.reload()
+  await page.getByRole('button', { name: 'Development backend — Disconnected', exact: true }).click()
   await expect(page.getByLabel('API token', { exact: true })).toHaveValue('')
   await expect(page.getByRole('button', { name: 'Connect backend' })).toBeVisible()
   expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0)
@@ -313,7 +314,7 @@ test('HMR updates disposable frontend sources without rebuilding Go or losing co
   try {
     await writeFile(
       source,
-      original.replace('Deduplicate concurrent session refreshes', 'Hot-reloaded sample workspace'),
+      original.replaceAll('Deduplicate concurrent session refreshes', 'Hot-reloaded sample workspace'),
     )
     await expect(page.getByRole('heading', { level: 1 })).toContainText(
       'Hot-reloaded sample workspace',

@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { digest, registered, sourceFixture } from './runtime-fixture'
 import type { QuestionAnswer } from '../src/runtime/questions'
 import type { SourceResponse } from '../src/runtime/source'
+import { quizFixture } from './quiz-fixture'
+import { semanticFixture } from './semantic-fixture'
 
 test.use({ baseURL: 'http://127.0.0.1:5175' })
 
@@ -15,7 +17,12 @@ async function workspace(page: Page, number: number): Promise<{ source: SourceRe
   const source = sourceFixture(pr, 3)
   const requests = { source: 0, questions: 0, observations: 0 }
   let answer: QuestionAnswer
-  await page.route(`**/api/reviews/${pr.id}/source`, async (route): Promise<void> => { requests.source++; await route.fulfill({ json: source }) })
+  await page.route(`**/api/reviews/${pr.id}/source`, async (route): Promise<void> => {
+    requests.source++
+    const input = route.request().postDataJSON()
+    const requestedRevisionID = input.action === 'refresh' ? digest([input.revision.prID, input.revision.baseSHA, input.revision.headSHA, input.revision.mergeBaseSHA].join('\n')) : undefined
+    await route.fulfill({ json: { ...source, requestedRevisionID } })
+  })
   await page.route(`**/api/reviews/${pr.id}/questions`, async (route): Promise<void> => {
     requests.questions++
     const input = route.request().postDataJSON()
@@ -68,6 +75,7 @@ test('continuous files retain a pinned draft through tree, rails and both themes
   await first.getByRole('button', { name: 'Discard draft', exact: true }).click()
   await page.getByRole('button', { name: 'Refresh source', exact: true }).click()
   await expect.poll((): number => f.requests.source).toBe(2)
+  await expect(page.getByRole('button', { name: 'Refresh source', exact: true })).toBeEnabled()
   await expect(page.getByRole('progressbar', { name: 'Files marked understood' })).toHaveAttribute('value', '1')
   Object.assign(f.source, sourceFixture(f.source.pr, 3, 'f'.repeat(40)))
   await page.getByRole('button', { name: 'Refresh source', exact: true }).click()
@@ -114,4 +122,76 @@ test('inline and panel synchronize a canonical draft without duplicate execution
   expect(await page.evaluate((): boolean => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: info.outputPath('conversation-text-200.png'), fullPage: true })
   expect(f.requests).toEqual({ source: 1, questions: 1, observations: 1 })
+})
+
+/** Verifies practice reset never regenerates or reveals unchecked saved keys.
+ * @param fixtures Browser fixture.
+ */
+test('quiz results derive from checked answers and Try again changes only practice', async ({ page }): Promise<void> => {
+  const pr = await registered(page, 982)
+  const f = quizFixture(pr)
+  let checks = 0
+  let generations = 0
+  await page.route('**/quiz', async (route): Promise<void> => { await route.fulfill({ json: f.read }) })
+  await page.route('**/quiz/generations', async (route): Promise<void> => { generations++; await route.abort() })
+  await page.route('**/quiz/*/questions/*/check', async (route): Promise<void> => {
+    checks++
+    const questionID = new URL(route.request().url()).pathname.split('/').at(-2)!
+    await route.fulfill({ json: { ...f.checked, questionID } })
+  })
+  await page.getByRole('button', { name: 'Quiz', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Quiz', exact: true })).toHaveAttribute('aria-description', '5 saved questions')
+  for (let index = 0; index < f.read.quiz!.questions.length; index++) {
+    await page.getByRole('radio').first().check()
+    await page.getByRole('button', { name: 'Check answer', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Answer explanation', exact: true })).toBeVisible()
+    if (index < f.read.quiz!.questions.length - 1) await page.getByRole('button', { name: 'Next question', exact: true }).click()
+  }
+  await page.getByRole('button', { name: 'See results', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Quiz results', exact: true })).toContainText('0 / 5 matched the saved key.')
+  await page.getByRole('button', { name: 'Try again', exact: true }).click()
+  await expect(page.getByRole('radio').first()).not.toBeChecked()
+  await expect(page.getByRole('heading', { name: 'Before you check', exact: true })).toBeVisible()
+  await expect(page.locator('.quiz-progress')).toContainText('0 of 5 checked')
+  expect(checks).toBe(5)
+  expect(generations).toBe(0)
+})
+
+/** Shares file understanding and rail preference without changing semantic evidence.
+ * @param fixtures Browser fixture.
+ */
+test('semantic groups share understanding and disclosure with Files changed', async ({ page }): Promise<void> => {
+  const pr = await registered(page, 983)
+  const f = semanticFixture(pr)
+  await page.route('**/source', async (route): Promise<void> => { await route.fulfill({ json: f.source }) })
+  await page.route('**/semantic-review', async (route): Promise<void> => { await route.fulfill({ json: f.read }) })
+  await page.getByRole('button', { name: 'Load pinned source', exact: true }).click()
+  await page.getByRole('button', { name: 'Mark understood src/file0000.ts', exact: true }).click()
+  await page.getByRole('button', { name: 'Semantic review', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Semantic review', exact: true })).toHaveAttribute('aria-description', `${f.read.review!.groups.length} saved groups`)
+  await expect(page.getByRole('progressbar', { name: 'Files marked understood' })).toHaveAttribute('value', '1')
+  await expect(page.getByRole('button', { name: 'Unmark understood src/file0000.ts', exact: true }).first()).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Toggle semantic groups', exact: true }).click()
+  await page.getByRole('button', { name: /^Files changed/ }).click()
+  await expect(page.locator('.file-disclosure')).not.toHaveAttribute('open')
+  await page.locator('.file-disclosure > summary').click()
+  await page.getByRole('button', { name: 'Semantic review', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Toggle semantic groups', exact: true })).toHaveAttribute('aria-expanded', 'true')
+})
+
+/** Exercises the same local transcript in preview inline and panel presentations.
+ * @param fixtures Browser fixture.
+ */
+test('sample creation stays inline and both sample views retain the same draft', async ({ page }): Promise<void> => {
+  await page.goto('/?preview=workspace')
+  await page.getByRole('textbox', { name: 'Your question', exact: true }).fill('Explicit fictional preview question')
+  await page.getByRole('button', { name: 'Preview thread creation', exact: true }).click()
+  const inline = page.getByRole('region', { name: 'Inline sample conversation', exact: true })
+  await expect(inline).toContainText('Sample transcript')
+  await inline.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).fill('One local preview draft')
+  await inline.getByRole('button', { name: 'Open in panel', exact: true }).click()
+  const panel = page.getByRole('complementary', { name: 'Question 01', exact: true })
+  await expect(panel.getByRole('textbox', { name: 'Follow up in this thread', exact: true })).toHaveValue('One local preview draft')
+  await panel.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).fill('Changed from sample panel')
+  await expect(inline.getByRole('textbox', { name: 'Follow up in this thread', exact: true })).toHaveValue('Changed from sample panel')
 })

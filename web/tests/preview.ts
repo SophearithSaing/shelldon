@@ -11,6 +11,9 @@ export async function openSampleThread(page: Page): Promise<void> {
   } else {
     await page.getByRole('textbox', { name: 'Your question', exact: true }).fill('What stops an old refresh from restoring a logged-out session?')
     await page.getByRole('button', { name: 'Preview thread creation', exact: true }).click()
+    await marker.click()
   }
+  const hide = page.getByRole('button', { name: 'Hide inline', exact: true })
+  if (await hide.isVisible()) await hide.click()
   await expect(page.getByRole('complementary', { name: 'Question 01', exact: true })).toBeVisible()
 }

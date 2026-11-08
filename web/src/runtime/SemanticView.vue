@@ -3,13 +3,14 @@ import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import UiButton from '../components/ui/UiButton.vue'
 import SourceDiff from '../components/SourceDiff.vue'
 import FileUnderstanding from '../components/FileUnderstanding.vue'
+import mascot from '../assets/mascot-semantic-review.png'
 import type { DiffLine, LineRange } from '../components/diff'
 import type { RuntimeClient } from './client'
 import type { PinnedDiff, SourceFile } from './source'
 import { semanticActive, semanticLines, semanticUngrouped, type SemanticRead, type SemanticStatus, type SemanticAnchor, type SemanticGroup } from './semantic'
 
 const props = defineProps<{ prID: string; client: RuntimeClient | null; active: boolean; diff?: PinnedDiff; drafting: boolean; understood?: Record<string, boolean> }>()
-const emit = defineEmits<{ source: [anchor: SemanticAnchor, revisionID: string, compose: boolean]; understood: [fileID: string] }>()
+const emit = defineEmits<{ source: [anchor: SemanticAnchor, revisionID: string, compose: boolean]; understood: [fileID: string]; count: [count: number | undefined] }>()
 const groupsOpen = defineModel<boolean>('groupsOpen', { default: true })
 const selection = shallowRef<SemanticAnchor | null>(null)
 const saved = shallowRef<SemanticRead>()
@@ -177,6 +178,7 @@ function selectedRange(excerpt: SemanticAnchor): LineRange | null { const s = se
  */
 function navigate(excerpt: SemanticAnchor, compose: boolean): void { const a = target(excerpt); if (review.value && canNavigate(a)) emit('source', { ...a }, review.value.diff.revisionID, compose) }
 
+watch((): number | undefined => review.value?.groups.length, (count): void => emit('count', count), { immediate: true })
 watch((): RuntimeClient | null => props.client, reset, { flush: 'sync' })
 watch((): string => props.prID, reset, { flush: 'sync' })
 watch((): boolean => props.active, (active: boolean): void => { if (active) void refresh(); else { stopPolling(); readRequest?.abort(); readRequest = undefined; reading.value = false } }, { immediate: true })
@@ -199,6 +201,7 @@ onUnmounted(reset)
       <p v-if="saved && !review">No saved semantic review. Opening this view never starts generation.</p>
       <p v-if="review">Original revision {{ review.diff.revisionID.slice(0, 8) }} · saved version {{ saved?.version }} · {{ !diff ? 'Currentness unverified; source is not loaded.' : diff.revisionID !== review.diff.revisionID ? 'Older revision; source was not retargeted.' : 'Matches displayed source.' }}</p>
     </header>
+    <section v-if="saved && !review" class="semantic-empty" :aria-busy="working"><img :src="mascot" alt="" aria-hidden="true" /><h3>{{ working ? 'Organizing changed ranges…' : 'Review changes by intent' }}</h3><p>Generate related groups explicitly from pinned source. Files changed remains the complete comparison.</p></section>
     <div v-if="review" class="semantic-layout" :class="{ 'groups-collapsed': !groupsOpen }">
       <aside class="semantic-groups"><UiButton variant="quiet" :aria-expanded="groupsOpen" aria-label="Toggle semantic groups" @click="groupsOpen = !groupsOpen">{{ groupsOpen ? '‹ Groups' : '›' }}</UiButton><div v-show="groupsOpen"><FileUnderstanding v-if="diff?.revisionID === review.diff.revisionID" :files="diff.files" :understood="understood ?? {}" /><nav aria-label="Semantic groups"><UiButton v-for="item in review.groups" :key="item.groupID" variant="quiet" :aria-current="selected === item.groupID ? 'page' : undefined" :title="item.title" @click="selected = item.groupID">{{ item.title }} · {{ new Set(item.ranges.map((range): string => range.fileID)).size }} files</UiButton><UiButton variant="quiet" :aria-current="selected === 'ungrouped' ? 'page' : undefined" @click="selected = 'ungrouped'">Ungrouped changes · {{ ungrouped.length }} changed lines</UiButton><p>{{ unsupported.length }} unsupported/non-text changes remain in Files changed. Counts describe source inventory, not semantic certainty.</p></nav></div></aside>
       <section class="semantic-excerpts" tabindex="0" aria-label="Grouped source excerpts">
@@ -235,5 +238,7 @@ onUnmounted(reset)
 .semantic-excerpt h4 { font-family: var(--font-code); font-size: var(--text-small); }
 .semantic-excerpt p { margin-block: var(--space-2); }
 .semantic-footer { color: var(--color-muted); font-size: var(--text-small); }
+.semantic-empty { display: grid; justify-items: center; align-content: center; flex: 1; min-height: 20rem; padding: var(--space-6); text-align: center; gap: var(--space-3); }
+.semantic-empty img { width: 12rem; height: 10rem; object-fit: contain; }
 @container semantic (max-width: 56rem) { .semantic-layout { grid-template-columns: minmax(0, 1fr); overflow: visible; flex: none; } .semantic-groups { max-height: 16rem; } .semantic-excerpts { max-height: 40rem; } }
 </style>

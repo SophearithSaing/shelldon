@@ -572,7 +572,7 @@ test('quiz failure and replacement preserve live question streams, both drafts, 
   await ask(page, 2, 'Independent active question')
   const answer = f.answers[0]!
   await snapshot(page, answer, { state: 'streaming', text: 'Question streaming before Quiz.' })
-  const followup = page.getByRole('textbox', { name: 'Follow up in this thread', exact: true })
+  const followup = page.locator('.workspace-conversation textarea')
   await followup.fill('Retain follow-up draft during Quiz')
   await page.getByRole('article', { name: 'Changed file src/file0000.ts', exact: true }).getByRole('button', { name: 'Select head line 4', exact: true }).click()
   await page.getByRole('article', { name: 'Changed file src/file0000.ts', exact: true }).getByRole('button', { name: 'Ask about selection', exact: true }).click()

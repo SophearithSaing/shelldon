@@ -29,7 +29,7 @@ const threads = ref(initialSampleThreads())
 const activeThreadId = ref<number | null>(threads.value[0]?.id ?? null)
 const shell = ref<InstanceType<typeof WorkspaceShell>>()
 const filesPreview = ref<InstanceType<typeof FilesChangedPreview>>()
-const viewed = ref<Record<string, boolean>>({ client: true, docs: true })
+const viewed = ref<Record<string, boolean>>({})
 const conversationOpen = ref(threads.value.length > 0)
 const semanticConversation = ref(false)
 const visibleConversation = computed({ get: getConversation, set: setConversation })
@@ -183,6 +183,14 @@ function createThread(thread: SampleThread): void {
   if (!threads.value.some((item): boolean => item.id === thread.id)) threads.value.unshift(thread)
 }
 
+/** Resolves the same sample state for inline and panel presentations.
+ * @param id Canonical sample thread identity.
+ * @returns Existing thread with its own editable follow-up.
+ */
+function sampleThread(id: number): SampleThread {
+  return threads.value.find((thread): boolean => thread.id === id)!
+}
+
 /**
  * Opens the selected local thread with a stable marker as the return-focus target.
  * @param id Existing sample thread identifier.
@@ -209,10 +217,11 @@ function selectFile(id: string): void {
       ref="shell"
       v-model:conversation-open="visibleConversation"
       :has-file-rail="activeTab === 'files'"
-      :conversation-title="conversationTitle"
+       :conversation-title="conversationTitle"
+       :hide-conversation="activeTab === 'quiz'"
     >
       <template #summary>
-        <h1 class="fixture-title">
+        <h1 class="fixture-title" :title="workspaceNumber === 251 ? 'Handle retries after a failed refresh' : 'Deduplicate concurrent session refreshes'">
           <template v-if="workspaceNumber === 251">Handle retries after a failed refresh</template>
           <template v-else>Deduplicate concurrent session refreshes</template>
           <span class="muted"> #{{ workspaceNumber }} · sample PR</span>
@@ -265,7 +274,9 @@ function selectFile(id: string): void {
             @open="openThread"
             @reveal="sourceRevealed"
             @viewed="(id, value) => viewed[id] = value"
-          />
+          >
+            <template #conversation="{ threadId }"><ThreadConversation v-model:followup="sampleThread(threadId).followup" :thread="sampleThread(threadId)" :busy-thread="busyThread" :preview-controls="false" @source="showSource" @understood="setUnderstood" @preview="previewState" /></template>
+          </FilesChangedPreview>
         </div>
 
         <div
@@ -313,7 +324,9 @@ function selectFile(id: string): void {
   font-weight: 550;
   line-height: 1.3;
   letter-spacing: -0.5px;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .fixture-meta {
   display: flex;

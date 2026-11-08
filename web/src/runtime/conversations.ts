@@ -27,6 +27,7 @@ export interface RuntimeThread {
   savedPersistence?: ThreadDetail['persistence']
   session?: SessionStatus
   continuationError?: string
+  reading?: { inline: number; panel: number }
 }
 interface Conversations {
   history: SavedThreads

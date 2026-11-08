@@ -33,6 +33,7 @@ const expanded = ref<number | null>(drafts.value[0]?.id ?? null)
 const pendingChange = ref<Change | null>(null)
 const pending = ref(false)
 const creating = ref(false)
+const inlineThreads = ref<number[]>([])
 const outcome = ref('success')
 const message = ref('')
 const outcomes = [
@@ -274,7 +275,7 @@ async function cancel(): Promise<void> {
 }
 
 /**
- * Creates one explicitly local sample thread and hands off to its panel.
+ * Creates one explicitly local sample thread and retains its inline view.
  */
 async function complete(): Promise<void> {
   const current = draft.value
@@ -290,11 +291,12 @@ async function complete(): Promise<void> {
     outcome.value === 'response-error' ? 'failed' : 'answered',
   )
   emit('create', thread)
+  inlineThreads.value.push(thread.id)
   drafts.value = drafts.value.filter((item): boolean => item.id !== current.id)
   expanded.value = null
   await nextTick()
   const marker = root.value?.querySelector<HTMLButtonElement>(`[data-thread-id="${thread.id}"]`)
-  if (marker) emit('open', thread.id, marker)
+  marker?.focus({ preventScroll: true })
   await nextTick()
   const scroll = root.value?.querySelector<HTMLElement>('.diff-scroll')
   const restoredAnchor = gutter(current.anchor.range)
@@ -334,6 +336,13 @@ function openThread(thread: SampleThread, event: MouseEvent): void {
   pendingChange.value = null
   expanded.value = null
   emit('open', thread.id, event.currentTarget as HTMLElement)
+}
+
+/** Toggles only a local transcript view, preserving its canonical thread draft.
+ * @param id Existing sample thread.
+ */
+function toggleInline(id: number): void {
+  inlineThreads.value = inlineThreads.value.includes(id) ? inlineThreads.value.filter((value): boolean => value !== id) : [...inlineThreads.value, id]
 }
 defineExpose({ selectFile, revealSource, revealAnchor })
 </script>
@@ -375,12 +384,12 @@ defineExpose({ selectFile, revealSource, revealAnchor })
           <label class="viewed-check"><input type="checkbox" :checked="viewed[file]" @change="emit('viewed', file, ($event.target as HTMLInputElement).checked)" />Understood</label>
         </header>
         <InlineQuestionComposer v-if="draft && !draft.anchor.range" v-model="draft.text" :context="context(draft.anchor)" :error="draft.error" :pending="pending" :busy="revisionBusy" @submit="submit" @cancel="cancel" @finish="complete" />
-        <button v-for="thread in fileThreads.filter((item) => !item.anchor.range)" :key="thread.id" class="question-marker" :data-thread-id="thread.id" :aria-label="`Open sample question ${thread.id}`" @click="openThread(thread, $event)">Question {{ thread.id }} · {{ thread.question }} →</button>
+        <template v-for="thread in fileThreads.filter((item) => !item.anchor.range)" :key="thread.id"><button class="question-marker" :data-thread-id="thread.id" :aria-label="`Open sample question ${thread.id}`" @click="openThread(thread, $event)">Question {{ thread.id }} · {{ thread.question }} →</button><UiButton variant="quiet" :aria-expanded="inlineThreads.includes(thread.id)" @click="toggleInline(thread.id)">{{ inlineThreads.includes(thread.id) ? 'Hide inline' : 'Show inline' }}</UiButton><section v-if="inlineThreads.includes(thread.id)" class="inline-sample" aria-label="Inline sample conversation"><UiButton variant="quiet" @click="openThread(thread, $event)">Open in panel</UiButton><slot name="conversation" :thread-id="thread.id" /></section></template>
         <div class="hunk-header">{{ selectedFile.hunk }}</div>
         <template v-for="block in blocks" :key="block.start">
           <SourceDiff :lines="block.lines" :label="block.start === 0 ? 'Sample source before draft' : 'Sample source after draft'" :selection="selection" :highlight="file !== 'docs'" @select="selectRange" />
           <InlineQuestionComposer v-if="draft?.anchor.range && anchorIndex(draft.anchor) === block.end" v-model="draft.text" :context="context(draft.anchor)" :error="draft.error" :pending="pending" :busy="revisionBusy" @submit="submit" @cancel="cancel" @finish="complete" />
-          <button v-for="thread in fileThreads.filter((item) => item.anchor.range && anchorIndex(item.anchor) === block.end)" :key="thread.id" class="question-marker" :data-thread-id="thread.id" :aria-label="`Open sample question ${thread.id}`" @click="openThread(thread, $event)"><span>{{ thread.id }}</span> {{ thread.question }} <span>Open thread →</span></button>
+          <template v-for="thread in fileThreads.filter((item) => item.anchor.range && anchorIndex(item.anchor) === block.end)" :key="thread.id"><button class="question-marker" :data-thread-id="thread.id" :aria-label="`Open sample question ${thread.id}`" @click="openThread(thread, $event)"><span>{{ thread.id }}</span> {{ thread.question }} <span>Open thread →</span></button><UiButton variant="quiet" :aria-expanded="inlineThreads.includes(thread.id)" @click="toggleInline(thread.id)">{{ inlineThreads.includes(thread.id) ? 'Hide inline' : 'Show inline' }}</UiButton><section v-if="inlineThreads.includes(thread.id)" class="inline-sample" aria-label="Inline sample conversation"><UiButton variant="quiet" @click="openThread(thread, $event)">Open in panel</UiButton><slot name="conversation" :thread-id="thread.id" /></section></template>
         </template>
         <footer class="diff-bottom"><span>{{ fileThreads.length ? `${fileThreads.length} sample questions in this file` : 'No submitted sample questions yet' }}</span><UiButton data-file-ask variant="quiet" @click="ask(true)">Ask about this file ↗</UiButton></footer>
       </article>
@@ -428,6 +437,7 @@ defineExpose({ selectFile, revealSource, revealAnchor })
 .recovery-tools .ui-button { margin: var(--space-2); }
 .context-guard { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-warning); border-radius: var(--radius-control); margin-bottom: var(--space-2); }
 .context-guard p { flex-basis: 100%; }
+.inline-sample { display: flex; flex-direction: column; max-height: 40rem; border: 1px solid var(--color-border); border-radius: var(--radius-panel); margin: var(--space-3); }
 @container files (min-width: 50rem) {
   .question-marker { margin-left: 4.625rem; width: calc(100% - 5.625rem); }
 }

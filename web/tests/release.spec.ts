@@ -71,6 +71,16 @@ test('isolated release binary serves the authenticated shell, fonts and complete
   expect(sansLicenseText).toContain('SIL OPEN FONT LICENSE')
   expect(sansLicenseText.length).toBeGreaterThan(4000)
   expect(sansLicenseText).toBe(await readFile(new URL('../src/assets/fonts/DM-Sans-LICENSE.txt', import.meta.url), 'utf8'))
+  const draft = page.getByRole('textbox', { name: 'Your question', exact: true })
+  await draft.fill('Retained through the standalone theme switch')
+  for (const theme of ['light', 'dark'] as const) {
+    await page.getByRole('button', { name: `Switch to ${theme} theme`, exact: true }).click()
+    await expect(draft).toHaveValue('Retained through the standalone theme switch')
+    await expect.poll((): Promise<number> => page.locator('.brand-image:visible').evaluate((image): number => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+    await expect(page.locator('.material-icon').first()).not.toHaveCSS('mask-image', 'none')
+    await page.screenshot({ path: testInfo.outputPath(`release-${theme}.png`) })
+  }
+  await draft.fill('')
   expect(urls.every((value): boolean => value.startsWith(url + '/'))).toBe(true)
   expect(urls.some((value): boolean => value.includes(token))).toBe(false)
   expect(await page.content()).not.toContain(token)

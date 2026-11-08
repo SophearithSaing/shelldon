@@ -3,13 +3,14 @@ import { computed, nextTick, onUnmounted, ref, shallowRef, useId, watch } from '
 import UiButton from '../components/ui/UiButton.vue'
 import SourceDiff from '../components/SourceDiff.vue'
 import ScrollRegion from '../components/ui/ScrollRegion.vue'
+import mascot from '../assets/mascot-quiz.png'
 import type { DiffLine } from '../components/diff'
 import type { RuntimeClient } from './client'
 import type { PinnedDiff, SourceLine } from './source'
 import { quizActive, type QuizRead, type QuizStatus, type QuizChecked, type QuizEvidence, type QuizQuestion } from './quiz'
 
 const props = defineProps<{ prID: string; client: RuntimeClient | null; active: boolean; diff?: PinnedDiff; drafting: boolean }>()
-const emit = defineEmits<{ source: [evidence: QuizEvidence, revisionID: string] }>()
+const emit = defineEmits<{ source: [evidence: QuizEvidence, revisionID: string]; count: [count: number | undefined] }>()
 const id = useId()
 const saved = shallowRef<QuizRead>()
 const status = shallowRef<QuizStatus | null>(null)
@@ -272,6 +273,7 @@ async function retryPractice(): Promise<void> {
   await go(0)
 }
 
+watch((): number | undefined => quiz.value?.questions.length, (count): void => emit('count', count), { immediate: true })
 watch((): readonly [string, RuntimeClient | null] => [props.prID, props.client], (): void => { reset(); if (props.active) void refresh() }, { flush: 'sync' })
 watch((): boolean => props.active, (active: boolean): void => {
   if (active) void refresh()
@@ -312,7 +314,7 @@ onUnmounted(reset)
           <div class="quiz-actions"><UiButton :disabled="position === 0" @click="go(position - 1)">Previous</UiButton><UiButton v-if="!checked" type="submit" variant="primary" :disabled="!selected || !!checking || reading || needsRead || !client">{{ checking ? 'Checking…' : 'Check answer' }}</UiButton><UiButton v-if="position < quiz.questions.length - 1" @click="go(position + 1)">Next question</UiButton><UiButton v-else :disabled="count !== quiz.questions.length" @click="results = true">See results</UiButton></div>
         </form>
       </template>
-      <div v-else-if="saved && !reading" class="quiz-empty"><h3>No saved quiz</h3><p>Generate questions explicitly from the displayed pinned source. Entering Quiz never generates automatically.</p><UiButton variant="primary" :disabled="unavailable" @click="generate">Generate quiz</UiButton></div>
+      <div v-else-if="saved && !reading" class="quiz-empty" :aria-busy="working"><img :src="mascot" alt="" aria-hidden="true" /><h3>No saved quiz</h3><p>Generate questions explicitly from the displayed pinned source. Entering Quiz never generates automatically.</p><UiButton variant="primary" :disabled="unavailable" @click="generate">Generate quiz</UiButton></div>
     </ScrollRegion>
     <aside class="quiz-explanation" aria-label="Quiz answer explanation"><h2>{{ checked ? 'Answer explanation' : 'Before you check' }}</h2><ScrollRegion label="Quiz explanation and original evidence" class="explanation-body"><template v-if="checked"><p>Agent-generated explanation · Verify against the original source.</p><p class="explanation-text">{{ checked.explanation }}</p><section v-for="(quote, index) in checked.evidence" :key="index" class="quiz-evidence"><h3>{{ quote.newPath ?? quote.oldPath }} · {{ quote.anchor.side }} {{ quote.anchor.start }}–{{ quote.anchor.end }}</h3><SourceDiff :lines="lines(quote)" label="Original quiz evidence" :selection="null" :selectable="false" /><UiButton :disabled="!navigable(quote)" @click="emit('source', quote, checked.revisionID)">View in original diff</UiButton><p v-if="!navigable(quote)">Original source navigation unavailable. Load the matching revision and finish or discard any pinned source draft; this quote remains readable.</p></section></template><p v-else>The saved key, explanation and source evidence are withheld until an explicit answer check. Selecting or navigating questions does not check an answer.</p></ScrollRegion></aside>
   </section>
@@ -338,12 +340,13 @@ legend { padding: 0; margin-bottom: var(--space-4); font-size: 1.25rem; line-hei
 .is-selected { background: var(--color-accent-soft); border-color: var(--color-accent-border); }
 .is-wrong { background: var(--color-error-soft); border-color: var(--color-error); }
 .is-correct { background: var(--color-success-soft); border-color: var(--color-success); }
-.quiz-explanation { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--color-border); border-radius: var(--radius-panel); }
+.quiz-explanation { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--color-border); background: var(--color-panel); }
 .quiz-explanation > h2 { padding: var(--space-4); border-bottom: 1px solid var(--color-border); font-size: var(--text-body); }
 .explanation-body { padding: var(--space-4); }
 .explanation-text { white-space: pre-wrap; }
 .quiz-evidence { margin-top: var(--space-5); min-width: 0; }
 .quiz-evidence h3 { font-size: var(--text-small); overflow-wrap: anywhere; margin-block: var(--space-3); }
-.quiz-empty { margin-block: var(--space-5); }
+.quiz-empty { display: grid; justify-items: center; align-content: center; min-height: 24rem; margin-block: var(--space-5); text-align: center; }
+.quiz-empty img { width: 12rem; height: 10rem; object-fit: contain; }
 @container workspace (max-width: 72rem) { .real-quiz { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; overflow: auto; } .quiz-main, .explanation-body { overflow: visible; flex: 0 0 auto; } .quiz-explanation { min-height: 12rem; } }
 </style>

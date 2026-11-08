@@ -2,7 +2,7 @@
 import { nextTick, ref, useId } from 'vue'
 import UiButton from './ui/UiButton.vue'
 
-defineProps<{ hasFileRail: boolean; conversationTitle: string }>()
+defineProps<{ hasFileRail: boolean; conversationTitle: string; hideConversation?: boolean }>()
 const conversationOpen = defineModel<boolean>('conversationOpen', { default: false })
 const filesOpen = defineModel<boolean>('filesOpen', { default: true })
 const id = useId()
@@ -53,7 +53,7 @@ async function closeConversation(): Promise<void> {
     <a v-show="conversationOpen" class="skip-link" :href="`#${id}-conversation-title`">
       Skip to conversation
     </a>
-    <div class="workspace" :class="{ 'has-file-rail': hasFileRail, 'has-conversation': conversationOpen }">
+    <div class="workspace" :class="{ 'has-file-rail': hasFileRail, 'has-conversation': conversationOpen && !hideConversation, 'without-conversation': hideConversation }">
       <section class="workspace-summary" aria-label="Pull request context">
         <slot name="summary" />
       </section>
@@ -76,7 +76,7 @@ async function closeConversation(): Promise<void> {
           <slot :open-conversation="openConversation" />
         </main>
         <aside
-          v-show="conversationOpen"
+          v-show="conversationOpen && !hideConversation"
           class="workspace-conversation"
           :aria-labelledby="`${id}-conversation-title`"
           tabindex="0"
@@ -92,7 +92,7 @@ async function closeConversation(): Promise<void> {
           </header>
           <slot name="conversation" />
          </aside>
-         <aside v-show="!conversationOpen" class="conversation-rail" aria-label="Collapsed conversations">
+         <aside v-show="!conversationOpen && !hideConversation" class="conversation-rail" aria-label="Collapsed conversations">
            <UiButton variant="quiet" aria-label="Open conversations panel" @click="openConversation">‹</UiButton>
            <span>Conversations</span>
          </aside>
@@ -157,6 +157,7 @@ async function closeConversation(): Promise<void> {
 .has-file-rail.has-conversation:has(.file-disclosure[open]) .workspace-panes {
   grid-template-columns: var(--width-file-rail) minmax(0, 1fr) var(--width-conversation);
 }
+.without-conversation .workspace-panes { grid-template-columns: minmax(0, 1fr); }
 .workspace-files {
   min-width: 0;
   min-height: 0;

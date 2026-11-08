@@ -3,13 +3,13 @@ import { computed, nextTick, ref, watch } from 'vue'
 import ScrollRegion from '../components/ui/ScrollRegion.vue'
 import UiButton from '../components/ui/UiButton.vue'
 import UiField from '../components/ui/UiField.vue'
+import MaterialIcon from '../components/MaterialIcon.vue'
 import { activeAnswer, type QuestionAnswer } from './questions'
 import type { RuntimeThread, RuntimeTurn } from './conversations'
 
 const props = defineProps<{ thread: RuntimeThread; threads: RuntimeThread[]; busyReason: string; displayedRevision?: string; historyPending?: boolean; historyError?: string; inline?: boolean; canShowInline?: boolean }>()
 const emit = defineEmits<{ followup: [thread: RuntimeThread]; stop: [turn: RuntimeTurn]; observe: [turn: RuntimeTurn]; save: [turn: RuntimeTurn]; select: [threadID: string]; refresh: []; source: []; panel: [trigger: HTMLElement] }>()
 const messages = ref<InstanceType<typeof ScrollRegion>>()
-const scroll = new Map<string, number>()
 const last = computed((): RuntimeTurn => props.thread.turns.at(-1)!)
 const context = computed((): string => {
   const anchor = props.thread.input.anchor
@@ -73,15 +73,20 @@ function continuation(): string {
 /**
  * Retains independent native scroll positions when switching between retained thread panels.
  * @param nextID Newly displayed thread.
- * @param previousID Previously displayed thread.
  */
-async function restoreScroll(nextID: string, previousID?: string): Promise<void> {
-  const element = messages.value?.$el as HTMLElement | undefined
-  if (previousID && element) scroll.set(previousID, element.scrollTop)
+async function restoreScroll(nextID: string): Promise<void> {
   await nextTick()
-  if (props.thread.id === nextID && messages.value) (messages.value.$el as HTMLElement).scrollTop = scroll.get(nextID) ?? 0
+  if (props.thread.id === nextID && messages.value) (messages.value.$el as HTMLElement).scrollTop = props.thread.reading?.[props.inline ? 'inline' : 'panel'] ?? 0
 }
 watch((): string => props.thread.id, restoreScroll, { immediate: true })
+
+/** Retains only this view's page-memory reading position on its canonical thread.
+ * @param event Native message-scroll event.
+ */
+function rememberScroll(event: Event): void {
+  props.thread.reading ??= { inline: 0, panel: 0 }
+  props.thread.reading[props.inline ? 'inline' : 'panel'] = (event.target as HTMLElement).scrollTop
+}
 
 /**
  * Sends on Enter while preserving Shift+Enter and IME composition as text input.
@@ -112,10 +117,10 @@ function shortcut(event: KeyboardEvent): void {
       <p v-if="thread.savedPersistence === 'failed'" class="thread-warning" role="status">Latest output is not saved. Disk history may be older than the retained runtime answer.</p>
     </div>
     <div class="thread-context"><strong>Pinned context</strong><p>{{ context }}</p><p v-if="!displayedRevision" class="thread-warning">Original source is not loaded. Saved quotes remain readable; continuing verifies the original source/session without fetching replacements.</p><p v-else-if="displayedRevision !== thread.turns[0]!.answer.revisionID" class="thread-warning">Older context. This thread is not rebound to the displayed source revision.</p><details v-if="thread.context" class="saved-quotes"><summary>Saved source quote</summary><p>Old coordinates refer to merge base {{ thread.context.revision.mergeBaseSHA.slice(0, 8) }}; head {{ thread.context.revision.headSHA.slice(0, 8) }}. Quotes alone do not authorize continuation.</p><pre><code v-for="line in thread.context.selected" :key="line.id">{{ line.sign }} {{ line.text }}{{ '\n' }}</code></pre></details></div>
-    <ScrollRegion ref="messages" label="Conversation messages" class="conversation-messages">
+    <ScrollRegion ref="messages" label="Conversation messages" class="conversation-messages" @scroll="rememberScroll">
       <article v-for="turn in thread.turns" :key="turn.answer.answerID" class="turn" :aria-label="`Answer to ${turn.answer.question}`">
-        <div class="thread-message user-message"><h3><span class="message-avatar" aria-hidden="true">Y</span>You</h3><p>{{ turn.answer.question }}</p></div>
-        <div class="thread-message agent-message"><h3><span class="message-avatar" aria-hidden="true">✧</span>Agent</h3><p v-if="turn.answer.text" class="answer-text">{{ turn.answer.text }}</p><p v-else class="empty-answer">{{ activeAnswer(turn.answer) ? 'No visible answer text yet.' : 'No visible answer text is available.' }}</p></div>
+        <div class="thread-message user-message"><h3><span class="message-avatar" aria-hidden="true"><MaterialIcon name="person" /></span>You</h3><p>{{ turn.answer.question }}</p></div>
+        <div class="thread-message agent-message"><h3><span class="message-avatar" aria-hidden="true"><MaterialIcon name="agent" /></span>Agent</h3><p v-if="turn.answer.text" class="answer-text">{{ turn.answer.text }}</p><p v-else class="empty-answer">{{ activeAnswer(turn.answer) ? 'No visible answer text yet.' : 'No visible answer text is available.' }}</p></div>
         <p class="execution-status" role="status">{{ status(turn.answer) }}</p>
         <p class="saving-status" role="status">{{ saving(turn.answer) }}</p>
         <UiButton v-if="turn.answer.persistence === 'failed'" :busy="turn.savePending" :disabled="turn.savePending" @click="emit('save', turn)">{{ turn.savePending ? 'Retrying save…' : 'Retry saving' }}</UiButton>

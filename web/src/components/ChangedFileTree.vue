@@ -59,11 +59,4 @@ const visibleGroups = computed(groups)
 .file-name { min-width: 0; overflow-wrap: anywhere; }
 .file-count { margin-left: auto; padding-inline: 0.3125rem; background: var(--color-panel); color: var(--color-accent); border-radius: 0.25rem; font-size: 0.625rem; }
 .viewed-icon { margin-left: auto; color: var(--color-success); }
-.viewed-summary { margin-top: var(--space-8); padding-inline: var(--space-2); font-size: var(--text-small); }
-.viewed-summary strong { float: right; }
-.viewed-summary p + p { margin-top: var(--space-2); color: var(--color-muted); }
-.viewed-segments { display: flex; gap: 0.25rem; margin-block: var(--space-3); }
-.viewed-segments span { flex: 1; height: 0.1875rem; border-radius: 0.1875rem; background: var(--color-border); }
-.viewed-segments .done { background: var(--color-accent); }
-.tree-note { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--color-border); line-height: 1.7; }
 </style>

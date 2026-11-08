@@ -141,7 +141,7 @@ export async function questionFlow(page: Page, context: BrowserContext, info: Te
     expect((await savedAdmissions(fixture, original.prID)).threads[0]!.answers[0]).toMatchObject({ state: 'pending', text: '' })
     await expect(page.getByText('Answering', { exact: true })).toBeVisible()
     await expect(page.locator('[data-answer]')).toHaveCount(1)
-    await expect(page.locator('[data-answer]')).toBeFocused()
+    await expect(page.getByRole('region', { name: 'Pinned PR source', exact: true }).getByRole('button', { name: 'Show inline', exact: true })).toBeFocused()
     await expect.poll(async (): Promise<number> => (await prompts(fixture)).length).toBe(1)
     const dispatch = JSON.parse((await prompts(fixture))[0]!.body!) as { text: string }
     for (const literal of [fixture.firstHead, fixture.mergeBase, 'before', 'after PR31', 'shared.txt', original.threadID, original.answerID]) expect(dispatch.text).toContain(literal)

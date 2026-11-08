@@ -9,6 +9,6 @@ import dark from '../assets/shelldon-logo-dark.png'
 
 <style scoped>
 .light-logo { display: none; }
-:global([data-theme='light']) .light-logo { display: block; }
-:global([data-theme='light']) .dark-logo { display: none; }
+:global([data-theme='light'] .brand-logo .light-logo) { display: block; }
+:global([data-theme='light'] .brand-logo .dark-logo) { display: none; }
 </style>

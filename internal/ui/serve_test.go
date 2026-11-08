@@ -17,6 +17,8 @@ func TestAssetsAreExactTypedFiles(t *testing.T) {
 		"assets/font.ttf":   {Data: []byte("font")},
 		"assets/font.woff2": {Data: []byte("font")},
 		"assets/OFL.txt":    {Data: []byte("license")},
+		"assets/logo.png":   {Data: []byte("\x89PNG\r\n\x1a\n")},
+		"logo.png":          {Data: []byte("private image")},
 		"assets/app.js.map": {Data: []byte("private source")},
 		"instance.lock":     {Data: []byte("private credential")},
 	}
@@ -29,6 +31,7 @@ func TestAssetsAreExactTypedFiles(t *testing.T) {
 		{"/assets/font.ttf", "font/ttf"},
 		{"/assets/font.woff2", "font/woff2"},
 		{"/assets/OFL.txt", "text/plain; charset=utf-8"},
+		{"/assets/logo.png", "image/png"},
 	} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", tt.path, nil))
@@ -39,7 +42,7 @@ func TestAssetsAreExactTypedFiles(t *testing.T) {
 			t.Fatal("HTML missing shell policy")
 		}
 	}
-	for _, path := range []string{"/api/unknown", "/assets", "/assets/", "/assets/app.js.map", "/assets/missing.js", "/src/main.ts", "/instance.lock", "/assets/../index.html", "/assets/%2e%2e/instance.lock", "/route"} {
+	for _, path := range []string{"/api/unknown", "/assets", "/assets/", "/assets/app.js.map", "/assets/missing.js", "/assets/missing.png", "/logo.png", "/src/main.ts", "/instance.lock", "/assets/../index.html", "/assets/%2e%2e/instance.lock", "/route"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		if w.Code != 404 || strings.Contains(w.Body.String(), "private") {

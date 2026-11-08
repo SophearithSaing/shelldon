@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import UiButton from '../components/ui/UiButton.vue'
 import SourceQuestions from './SourceQuestions.vue'
 import type { DiffLine } from '../components/diff'
@@ -15,6 +15,32 @@ const root = ref<HTMLElement>()
 const questions = new Map<string, InstanceType<typeof SourceQuestions>>()
 const draftFile = ref('')
 const displayLines = new WeakMap<SourceFile, DiffLine[]>()
+const rendered = ref(new Set(props.diff.files.slice(0, 1).map((file): string => file.id)))
+let observer: IntersectionObserver | undefined
+
+/** Mounts nearby source once, retaining every visited composer and transcript. */
+function observeFiles(): void {
+  observer = new IntersectionObserver((entries): void => {
+    for (const entry of entries) {
+      const fileID = (entry.target as HTMLElement).dataset.sourceFile
+      if (entry.isIntersecting && fileID) rendered.value.add(fileID)
+    }
+  }, { root: root.value?.parentElement, rootMargin: '1000px 0px' })
+  for (const element of root.value?.querySelectorAll('[data-source-file]') ?? []) observer.observe(element)
+}
+
+/** Releases only layout observation, never source or question execution. */
+function stopObserving(): void { observer?.disconnect() }
+onMounted(observeFiles)
+onUnmounted(stopObserving)
+
+/** Reserves continuous scroll space before a file's source rows are mounted.
+ * @param file Original changed file.
+ * @returns Approximate height at the current source line pitch.
+ */
+function estimatedHeight(file: SourceFile): string {
+  return `${file.hunks.reduce((count, hunk): number => count + hunk.lines.length, 0) * 1.5625 + 5}rem`
+}
 
 /** Adapts literal pinned hunks without generating or fetching source.
  * @param file Original changed file.
@@ -72,6 +98,7 @@ function section(fileID: string): HTMLElement | undefined {
  * @param fileID Requested file identity.
  */
 async function selectFile(fileID: string): Promise<void> {
+  rendered.value.add(fileID)
   await nextTick()
   const target = section(fileID)
   if (!target) return
@@ -124,9 +151,10 @@ defineExpose({ selectFile, selectRange, updateCurrent, showInline })
         <UiButton variant="quiet" :aria-pressed="understood[file.id] === true" :aria-label="`${understood[file.id] ? 'Unmark understood' : 'Mark understood'} ${file.newPath ?? file.oldPath}`" @click="emit('understood', file.id)">{{ understood[file.id] ? '✓ Understood' : '○ Mark understood' }}</UiButton>
         <details v-if="file.oldPath !== file.newPath || file.oldMode !== file.newMode || file.kind !== 'text'"><summary>Change details</summary><p>{{ file.status }} · {{ file.kind }}</p><p v-if="file.oldPath && file.newPath && file.oldPath !== file.newPath">Renamed from {{ file.oldPath }}</p><p v-if="file.oldMode !== file.newMode">Mode {{ file.oldMode }} → {{ file.newMode }}</p></details>
       </header>
-      <SourceQuestions v-if="file.kind === 'text'" :ref="(instance): void => register(file.id, instance)" :diff="diff" :file="file" :lines="lines(file)" :client="client" :source-pending="pending" :selection-blocked="!!draftFile && draftFile !== file.id" :markers="markers(file.id)" :busy-reason="busyReason" @guard="(active): void => guard(file.id, active)" @sending="emit('sending', $event)" @admitted="(answer, input): void => emit('admitted', answer, input)" @open="(answer, trigger): void => emit('open', answer, trigger)">
+      <SourceQuestions v-if="file.kind === 'text' && rendered.has(file.id)" :ref="(instance): void => register(file.id, instance)" :diff="diff" :file="file" :lines="lines(file)" :client="client" :source-pending="pending" :selection-blocked="!!draftFile && draftFile !== file.id" :markers="markers(file.id)" :busy-reason="busyReason" @guard="(active): void => guard(file.id, active)" @sending="emit('sending', $event)" @admitted="(answer, input): void => emit('admitted', answer, input)" @open="(answer, trigger): void => emit('open', answer, trigger)">
         <template #conversation="slotProps"><slot name="conversation" v-bind="slotProps" /></template>
       </SourceQuestions>
+      <div v-else-if="file.kind === 'text'" class="source-placeholder" :style="{ minHeight: estimatedHeight(file) }"><UiButton @click="selectFile(file.id)">Render source for {{ file.newPath ?? file.oldPath }}</UiButton><p>Pinned source is loaded. Rows render as you approach this file.</p></div>
       <div v-else class="source-notice" role="status"><h3>{{ file.kind }} change</h3><p>{{ file.reason ?? 'This change has no unified text lines. No source lines are invented.' }}</p><p>Line questions are unavailable for non-text changes.</p><p v-if="file.kind === 'submodule'">Submodules are not initialized.</p><p>Old object: {{ file.oldObject }}</p><p>New object: {{ file.newObject }}</p></div>
     </article>
     <div v-if="!diff.files.length" class="source-notice"><h2>No changes in this comparison</h2><p>The pinned merge base and head have an empty diff.</p></div>
@@ -142,4 +170,5 @@ defineExpose({ selectFile, selectRange, updateCurrent, showInline })
 .file-header summary { cursor: pointer; }
 .file-header .ui-button { padding-block: 0; font-size: var(--text-small); }
 .source-notice { padding: var(--space-4); overflow-wrap: anywhere; }
+.source-placeholder { padding: var(--space-4); color: var(--color-muted); font-size: var(--text-small); }
 </style>

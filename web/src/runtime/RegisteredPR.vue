@@ -30,7 +30,6 @@ const notice = ref('')
 const selected = ref('')
 const search = ref('')
 const branch = ref('')
-const sourceHeading = ref<HTMLElement>()
 const sourcePane = ref<HTMLElement>()
 const sourceQuestions = ref<InstanceType<typeof PinnedFiles>>()
 const understood = ref<Record<string, boolean>>({})
@@ -44,6 +43,8 @@ const { list: savedList, pending: historyPending, error: historyError } = conver
 const view = ref<'files' | 'questions' | 'quiz' | 'semantic'>('files')
 const quizOpened = ref(false)
 const semanticOpened = ref(false)
+const quizCount = ref<number>()
+const semanticCount = ref<number>()
 const opening = ref('')
 let openEpoch = 0
 const initialSending = ref(false)
@@ -70,6 +71,8 @@ function reset(): void {
   view.value = 'files'
   quizOpened.value = false
   semanticOpened.value = false
+  quizCount.value = undefined
+  semanticCount.value = undefined
   controller?.abort()
   controller = undefined
   source.value = undefined
@@ -145,8 +148,7 @@ async function load(input: SourceRequest = { action: 'load' }): Promise<void> {
     await nextTick()
     if (current.signal.aborted || controller !== current || requestedID !== props.reviewId || client !== props.client) return
     if (document.activeElement === document.body || document.activeElement instanceof Node && sourcePane.value?.contains(document.activeElement)) {
-      if (sourceHeading.value) sourceHeading.value.focus()
-      else sourcePane.value?.focus()
+      sourcePane.value?.focus()
     }
   } catch (failure: unknown) {
     if (!current.signal.aborted && controller === current && requestedID === props.reviewId && client === props.client) {
@@ -239,7 +241,8 @@ function guardDraft(active: boolean): void {
 function openAnswer(answer: QuestionAnswer, trigger: HTMLElement): void {
   openEpoch++
   selectedID.value = answer.threadID
-  void workspace.value?.openConversation(trigger)
+  const marker = trigger.closest('.inline-thread')?.querySelector<HTMLElement>('[data-answer]') ?? trigger
+  void workspace.value?.openConversation(marker)
 }
 
 /**
@@ -340,23 +343,24 @@ onUnmounted(reset)
       <span>Registered PR</span><OpenPR :client="client" /><slot name="runtime-trigger" /><ThemeToggle />
     </header>
     <slot name="runtime-panel" />
-    <WorkspaceShell v-if="reviewState.status === 'registered' && pr" ref="workspace" v-model:conversation-open="conversationOpen" v-model:files-open="filesOpen" :has-file-rail="view === 'files' && !!diff && files.length > 0" conversation-title="Question conversation">
+    <WorkspaceShell v-if="reviewState.status === 'registered' && pr" ref="workspace" v-model:conversation-open="conversationOpen" v-model:files-open="filesOpen" :hide-conversation="view === 'quiz'" :has-file-rail="view === 'files' && !!diff && files.length > 0" conversation-title="Question conversation">
       <template #summary>
-        <h1 class="pr-title">{{ pr.title ?? `Pull request #${pr.number}` }}</h1>
+        <h1 class="pr-title" :title="pr.title ?? `Pull request #${pr.number}`">{{ pr.title ?? `Pull request #${pr.number}` }}</h1>
          <details class="fixture-meta"><summary>PR details</summary><p><span>{{ pr.owner }}/{{ pr.repository }} #{{ pr.number }}</span> · <span>{{ pr.author ? `Author: ${pr.author}` : 'Author unavailable' }}</span><span v-if="diff"> · {{ diff.revision.baseBranch }} · {{ diff.revision.mergeBaseSHA.slice(0, 8) }} → {{ diff.revision.headSHA.slice(0, 8) }}</span></p></details>
         <a class="github-link" :href="pr.url" target="_blank" rel="noreferrer">View on GitHub ↗</a>
       </template>
       <template #tabs>
-        <nav class="real-tabs" aria-label="PR views"><UiButton variant="quiet" :aria-current="view === 'files' ? 'page' : undefined" @click="changeView('files')">Files changed<span v-if="diff"> ({{ files.length }})</span></UiButton><UiButton variant="quiet" :aria-current="view === 'questions' ? 'page' : undefined" @click="changeView('questions')">Questions</UiButton><UiButton variant="quiet" :aria-current="view === 'quiz' ? 'page' : undefined" @click="changeView('quiz')">Quiz</UiButton><UiButton variant="quiet" :aria-current="view === 'semantic' ? 'page' : undefined" @click="changeView('semantic')">Semantic review</UiButton><UiButton v-if="threads.length && !conversationOpen" variant="quiet" @click="workspace?.openConversation($event)">Open conversation</UiButton></nav>
+        <nav class="real-tabs" aria-label="PR views"><UiButton variant="quiet" :aria-current="view === 'files' ? 'page' : undefined" @click="changeView('files')">Files changed<span v-if="diff"> ({{ files.length }})</span></UiButton><UiButton variant="quiet" :aria-current="view === 'questions' ? 'page' : undefined" @click="changeView('questions')">Questions</UiButton><UiButton variant="quiet" :aria-description="quizCount === undefined ? undefined : `${quizCount} saved questions`" :aria-current="view === 'quiz' ? 'page' : undefined" @click="changeView('quiz')">Quiz<span v-if="quizCount !== undefined" aria-hidden="true">{{ quizCount }}</span></UiButton><UiButton variant="quiet" :aria-description="semanticCount === undefined ? undefined : `${semanticCount} saved groups`" :aria-current="view === 'semantic' ? 'page' : undefined" @click="changeView('semantic')">Semantic review<span v-if="semanticCount !== undefined" aria-hidden="true">{{ semanticCount }}</span></UiButton><UiButton v-if="threads.length && !conversationOpen" variant="quiet" @click="workspace?.openConversation($event)">Open conversation</UiButton></nav>
       </template>
       <template #files><FileUnderstanding :files="files" :understood="understood" /><ChangedFileTree v-model="search" :files="treeFiles" :current="selected" :counts="questionCounts" :viewed="understood" real @select="selectFile" /></template>
       <template #progress>{{ files.length ? Math.round(100 * files.filter((file): boolean => understood[file.id]).length / files.length) : 0 }}%</template>
       <template #conversation>
-        <QuestionConversation v-if="currentThread" :thread="currentThread" :threads="threads" :busy-reason="currentBusy" :displayed-revision="diff?.revisionID" :history-pending="historyPending" :history-error="historyError" :can-show-inline="!drafting && !pending && currentThread.turns[0]!.answer.revisionID === diff?.revisionID" @source="showInline" @refresh="conversations.refreshSaved(currentThread)" @followup="conversations.followup" @stop="conversations.stop" @observe="conversations.observe" @save="conversations.save" @select="selectThread" />
+        <QuestionConversation v-if="currentThread && conversationOpen" :thread="currentThread" :threads="threads" :busy-reason="currentBusy" :displayed-revision="diff?.revisionID" :history-pending="historyPending" :history-error="historyError" :can-show-inline="!drafting && !pending && currentThread.turns[0]!.answer.revisionID === diff?.revisionID" @source="showInline" @refresh="conversations.refreshSaved(currentThread)" @followup="conversations.followup" @stop="conversations.stop" @observe="conversations.observe" @save="conversations.save" @select="selectThread" />
+        <p v-else class="source-notice">Select source lines to ask a question, or open Questions to read saved conversations. Opening this panel starts no inference.</p>
       </template>
       <template #default>
-        <QuizView v-if="quizOpened" v-show="view === 'quiz'" :pr-i-d="reviewId" :client="client" :active="view === 'quiz'" :diff="diff" :drafting="drafting" @source="quizSource" />
-        <SemanticView v-if="semanticOpened" v-show="view === 'semantic'" v-model:groups-open="filesOpen" :pr-i-d="reviewId" :client="client" :active="view === 'semantic'" :diff="diff" :drafting="drafting || pending" :understood="understood" @understood="toggleUnderstood" @source="semanticSource" />
+        <QuizView v-if="quizOpened" v-show="view === 'quiz'" :pr-i-d="reviewId" :client="client" :active="view === 'quiz'" :diff="diff" :drafting="drafting" @count="quizCount = $event" @source="quizSource" />
+        <SemanticView v-if="semanticOpened" v-show="view === 'semantic'" v-model:groups-open="filesOpen" :pr-i-d="reviewId" :client="client" :active="view === 'semantic'" :diff="diff" :drafting="drafting || pending" :understood="understood" @count="semanticCount = $event" @understood="toggleUnderstood" @source="semanticSource" />
         <SavedQuestions v-show="view === 'questions'" :list="savedList" :threads="threads" :pending="historyPending" :error="historyError" :opening="opening" :selected="selectedID" :drafting="drafting" @refresh="conversations.history.refreshList(reviewId)" @open="openThread" />
         <section v-show="view === 'files'" id="review-content" ref="sourcePane" class="source-pane" tabindex="-1" :aria-busy="pending && !diff" aria-label="Pinned PR source" @scroll.passive="sourceQuestions?.updateCurrent()">
           <div v-if="diff" class="refresh-controls">
@@ -411,22 +415,19 @@ onUnmounted(reset)
 .review-header > span { flex: 1; color: var(--color-muted); }
 .review-header > a { display: inline-flex; align-items: center; min-height: var(--target-control); }
 .review-header > a:first-child { font-size: 1.375rem; }
-.pr-title { grid-column: 1; font-size: var(--text-heading); font-weight: 550; line-height: 1.3; overflow-wrap: anywhere; }
+.pr-title { grid-column: 1; font-size: var(--text-heading); font-weight: 550; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fixture-meta { grid-column: 1; overflow-wrap: anywhere; color: var(--color-muted); }
 .github-link { grid-column: 3; grid-row: 1; align-self: center; }
 .real-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .real-tabs .ui-button { min-height: var(--target-control); font-size: var(--text-small); }
 .real-tabs [aria-current] { border-bottom: 2px solid var(--color-accent); border-radius: 0; }
 .source-pane { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; background: var(--color-panel); }
-.revision-bar, .file-header { flex-shrink: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; }
+.revision-bar { flex-shrink: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; }
 .revision-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); font-size: var(--text-small); }
 .revision-bar details { max-width: 100%; }
 .revision-bar summary { min-height: var(--target-control); cursor: pointer; }
 .revision-bar dl { font-family: var(--font-code); font-size: var(--text-code-meta); padding-block: var(--space-3); }
 .revision-bar dt { color: var(--color-muted); margin-top: var(--space-2); }
-.file-header h2 { font-family: var(--font-code); font-size: var(--text-body); white-space: pre-wrap; }
-.file-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-2); font-size: var(--text-small); }
-.file-tools > span:first-child { flex: 1; }
 .source-notice, .review-message { padding: var(--space-6); overflow-wrap: anywhere; }
 .source-notice > * + *, .source-notice form > * + *, .review-message > * + * { margin-top: var(--space-4); }
 .source-notice select { display: block; width: min(100%, 35rem); min-height: var(--target-control); color: var(--color-text); background: var(--color-canvas); border: 1px solid var(--color-border-strong); padding: var(--space-2); }
@@ -434,7 +435,6 @@ onUnmounted(reset)
 .source-skeleton { display: grid; gap: var(--space-5); max-width: 45rem; padding-block: var(--space-4); }
 .source-skeleton span { height: 0.75rem; background: var(--color-surface); border-radius: var(--radius-control); }
 .source-skeleton span:nth-child(even) { width: 65%; }
-.real-source { flex-shrink: 0; }
 .refresh-controls { flex-shrink: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); font-size: var(--text-small); overflow-wrap: anywhere; }
 .refresh-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .refresh-controls p { margin-top: var(--space-2); }
