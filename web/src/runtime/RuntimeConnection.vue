@@ -14,11 +14,37 @@ const connectionPanel = ref<HTMLElement>()
 const expanded = defineModel<boolean>('expanded', { default: true })
 const emit = defineEmits<{ state: [value: string]; review: [value: ReviewState]; connection: [value: RuntimeClient | null] }>()
 let controller: AbortController | undefined
+const tokenStorageKey = 'sheldon.runtime-token'
+
+/**
+ * Reads this tab's saved credential when browser storage is available.
+ * @returns Saved token, or an empty string when unavailable.
+ */
+function savedToken(): string {
+  try {
+    return sessionStorage.getItem(tokenStorageKey) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Saves or clears this tab's credential without requiring browser storage.
+ * @param token Verified token, or an empty string to clear it.
+ */
+function saveToken(token: string): void {
+  try {
+    if (token) sessionStorage.setItem(tokenStorageKey, token)
+    else sessionStorage.removeItem(tokenStorageKey)
+  } catch {
+    return
+  }
+}
 
 /**
  * Aborts any in-flight connection and resets the UI to a disconnected state.
  */
-function disconnect(): void {
+function resetConnection(): void {
   expanded.value = true
   controller?.abort()
   controller = undefined
@@ -26,6 +52,12 @@ function disconnect(): void {
   emit('connection', null)
   emit('review', { status: 'disconnected' })
   state.value = 'Disconnected'
+}
+
+/** Disconnects the runtime and forgets this tab's saved credential. */
+function disconnect(): void {
+  saveToken('')
+  resetConnection()
 }
 
 /** Requires an explicit decision before clearing a question workspace's page-memory state. */
@@ -71,6 +103,7 @@ async function connect(token = tokenInput.value): Promise<void> {
       emit('review', pr ? { status: 'registered', pr } : { status: 'not-found' })
     }
     connected.value = true
+    saveToken(token)
     emit('connection', runtimeClient(token, current.signal))
     state.value = 'Backend connected'
     expanded.value = false
@@ -98,15 +131,15 @@ function reportState(value: string): void {
 }
 
 /**
- * Consumes the transient launch token when the runtime first mounts.
+ * Connects with a fresh launch token or restores this tab's verified connection.
  */
 function connectLaunch(): void {
-  const token = takeLaunchToken()
+  const token = takeLaunchToken() || savedToken()
   if (token) void connect(token)
 }
 watch(state, reportState, { immediate: true })
 onMounted(connectLaunch)
-onUnmounted(disconnect)
+onUnmounted(resetConnection)
 </script>
 
 <template>
@@ -135,7 +168,8 @@ onUnmounted(disconnect)
     </form>
     <p v-if="!connected" id="runtime-token-hint" class="muted small">
       Rerun the original sheldon command to connect automatically, or enter the token from its private
-      instance.lock. Tokens stay in page memory; reloading requires reconnecting.
+      instance.lock. Verified tokens stay in this tab's session storage to reconnect after refresh.
+      Disconnect clears the saved token. If browser storage is blocked, reconnect manually after refresh.
     </p>
     <div class="runtime-status">
       <p>{{ state }}</p>

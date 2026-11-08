@@ -83,18 +83,6 @@ async function check(page: Page, question: number, choice: number): Promise<Quiz
 }
 
 /**
- * Explicitly verifies the existing connection after a document reload.
- * @param page Reloaded application page.
- * @param token Test-owned credential, never put in request URLs or artifacts.
- */
-async function connect(page: Page, token: string): Promise<void> {
-  await expect(page.getByLabel('API token', { exact: true })).toHaveValue('')
-  await page.getByLabel('API token', { exact: true }).fill(token)
-  await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Quiz', exact: true })).toBeVisible()
-}
-
-/**
  * Probes only a child PID recorded by the disposable native fixture.
  * @param pid Owned child identity.
  * @returns Whether the owned process is still alive.
@@ -219,7 +207,7 @@ export async function quizFlow(page: Page, context: BrowserContext, info: TestIn
     expect(await readFile(quizPath)).toEqual(bytes)
     await tab.close()
     await page.reload()
-    await connect(page, initial.token)
+    await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
     expect((await enter(page)).quiz?.quizID).toBe(saved.quizID)
     await expect(page.getByText('0 of 5 checked in this page', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Before you check', exact: true })).toBeVisible()

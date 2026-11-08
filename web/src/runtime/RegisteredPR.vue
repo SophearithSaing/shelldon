@@ -387,7 +387,7 @@ onUnmounted(reset)
     </WorkspaceShell>
     <main v-else id="review-content" class="review-message" tabindex="-1" :aria-busy="reviewState.status === 'loading'">
       <template v-if="reviewState.status === 'not-found'"><h1>PR not found</h1><p role="status">This PR is not registered in this Sheldon instance. Reopen its GitHub URL with sheldon open.</p></template>
-      <template v-else><h1>PR workspace</h1><p v-if="reviewState.status === 'loading'" role="status">Reading registered PR…</p><p v-else-if="reviewState.status === 'failed'" role="status">Cannot read this PR. Check the backend and private prs.json index, then reconnect.</p><p v-else role="status">Connect the local runtime to read this registered PR. Reloading requires explicit reconnection.</p></template>
+      <template v-else><h1>PR workspace</h1><p v-if="reviewState.status === 'loading'" role="status">Reading registered PR…</p><p v-else-if="reviewState.status === 'failed'" role="status">Cannot read this PR. Check the backend and private prs.json index, then reconnect.</p><p v-else role="status">Connect the local runtime to read this registered PR. This tab reconnects automatically after refresh when session storage is available.</p></template>
       <p>Workspace ID: {{ reviewId }}</p><a href="/">Open a PR</a>
     </main>
   </div>
