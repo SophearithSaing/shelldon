@@ -166,45 +166,46 @@ test('release paths retain Host/Origin protection, bearer auth and no source or 
   }
 })
 
-test('release reload requires explicit reconnecting and wrong proof never receives a bearer', async ({
+/**
+ * Restores the tab's connection only after verifying the backend again.
+ * @param fixtures Browser page.
+ */
+test('release reload reconnects and wrong proof never receives a saved bearer', async ({
   page,
-}) => {
+}): Promise<void> => {
   const { url, token } = await state()
   await page.goto(`${url}/#token=${token}`)
   await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
   await page.getByRole('button', { name: 'Local runtime — Backend connected', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Disconnect backend' })).toBeVisible()
   await page.reload()
-  await expect(page.getByLabel('API token', { exact: true })).toHaveValue('')
-  expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0)
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+  expect(await page.evaluate((): number => localStorage.length)).toBe(0)
   let bearerSent = false
-  page.on('request', (request) => {
+  page.on('request', (request): void => {
     if (request.headers().authorization) bearerSent = true
   })
-  await page.route('**/instance-proof', (route) =>
+  await page.route('**/instance-proof', (route): Promise<void> =>
     route.fulfill({ json: { origin: url, proof: 'A'.repeat(43) } }),
   )
-  await page.getByLabel('API token', { exact: true }).fill(token)
-  await page.getByRole('button', { name: 'Connect backend' }).click()
+  await page.reload()
   await expect(page.getByRole('status').filter({ hasText: 'Connection failed' })).toBeVisible()
   expect(bearerSent).toBe(false)
   await expect(page.getByLabel('API token', { exact: true })).toHaveValue('')
+  expect(await page.evaluate((): number => localStorage.length + sessionStorage.length)).toBe(0)
   expect(await page.content()).not.toContain(token)
 })
 
 /**
- * Verifies manual recovery and disconnect across Slate destinations with no credential persistence.
+ * Verifies automatic recovery and explicit credential removal across Slate destinations.
  * @param fixtures Playwright page fixture.
  * @param testInfo Screenshot output location.
  */
-test('release reconnects manually and disconnects without rebinding sample workspaces', async ({ page }, testInfo): Promise<void> => {
+test('release reconnects automatically and disconnects without rebinding sample workspaces', async ({ page }, testInfo): Promise<void> => {
   const { url, token } = await state()
   await page.goto(`${url}/?preview=sample#token=${token}`)
   await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
   await page.reload()
-  await expect(page.getByLabel('API token', { exact: true })).toHaveValue('')
-  await page.getByLabel('API token', { exact: true }).fill(token)
-  await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
   await expect(page.getByLabel('API token', { exact: true })).toHaveCount(0)
   const draft = page.getByRole('textbox', { name: 'Your question', exact: true })
@@ -233,7 +234,7 @@ test('release reconnects manually and disconnects without rebinding sample works
  * @param fixtures Browser pages and request client.
  * @param testInfo Screenshot output location.
  */
-test('registered release routes isolate PRs, reuse aliases and require reconnecting', async ({ page, context, request }, testInfo): Promise<void> => {
+test('registered release routes isolate PRs, reuse aliases and reconnect after refresh', async ({ page, context, request }, testInfo): Promise<void> => {
   const { url, token } = await state()
   const headers = { Authorization: `Bearer ${token}` }
   const first = await request.post(url + '/api/open', { headers, data: { url: 'https://github.com/route/repo/pull/101' } })
@@ -257,12 +258,8 @@ test('registered release routes isolate PRs, reuse aliases and require reconnect
   expect((await request.get(url + '/api/open', { headers })).status()).toBe(404)
   await page.screenshot({ path: testInfo.outputPath('registered-review-1440.png'), fullPage: true })
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Connect backend' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Pull request #101' })).toHaveCount(0)
-  await page.getByLabel('API token', { exact: true }).fill(token)
-  await page.getByRole('button', { name: 'Connect backend' }).click()
   await expect(page.getByRole('heading', { name: 'Pull request #101' })).toBeVisible()
-  expect(await page.evaluate((): number => localStorage.length + sessionStorage.length)).toBe(0)
+  expect(await page.evaluate((): number => localStorage.length)).toBe(0)
   await page.setViewportSize({ width: 700, height: 900 })
   await page.screenshot({ path: testInfo.outputPath('registered-review-700.png'), fullPage: true })
   await page.evaluate((): void => { document.documentElement.style.fontSize = '200%' })

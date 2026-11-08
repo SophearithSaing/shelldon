@@ -115,6 +115,99 @@ test('manual connection rejects bad credentials without reflecting or saving the
   await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
 })
 
+/**
+ * Restores manual connections only in their tab and forgets credentials on disconnect.
+ * @param fixtures Browser page and context.
+ * @param testInfo Screenshot output location.
+ */
+test('manual connection survives refresh without connecting an independent tab', async ({ page, context }, testInfo): Promise<void> => {
+  const { token } = await credentials()
+  await page.goto('/')
+  await page.getByLabel('API token', { exact: true }).fill(token)
+  await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+  expect(await page.evaluate((): number => localStorage.length)).toBe(0)
+  expect(await page.content()).not.toContain(token)
+  await page.screenshot({ path: testInfo.outputPath('runtime-restored.png'), fullPage: true })
+  const other = await context.newPage()
+  await other.goto(frontend)
+  await expect(other.getByRole('button', { name: 'Connect backend', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Development backend — Backend connected', exact: true }).click()
+  await page.getByRole('button', { name: 'Disconnect backend', exact: true }).click()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Connect backend', exact: true })).toBeVisible()
+  expect(await page.evaluate((): number => sessionStorage.length)).toBe(0)
+  await other.close()
+})
+
+/**
+ * Revalidates saved credentials and clears them without sending a bearer to the wrong backend.
+ * @param fixtures Browser page.
+ */
+test('saved connection verifies backend proof again on refresh', async ({ page }): Promise<void> => {
+  const { token } = await credentials()
+  await page.goto(`/#token=${token}`)
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+  let bearerSent = false
+  page.on('request', (request): void => { if (request.headers().authorization) bearerSent = true })
+  await page.route('**/instance-proof', (route): Promise<void> => route.fulfill({ json: { origin: backend, proof: 'A'.repeat(43) } }))
+  await page.reload()
+  await expect(page.getByRole('status').filter({ hasText: 'Connection failed' })).toBeVisible()
+  expect(bearerSent).toBe(false)
+  expect(await page.evaluate((): number => sessionStorage.length)).toBe(0)
+  await expect(page.getByLabel('API token', { exact: true })).toHaveValue('')
+})
+
+/**
+ * Allows an explicit connection when browser policy disables session storage.
+ * @param fixtures Browser page.
+ */
+test('blocked session storage falls back to manual reconnection', async ({ page }): Promise<void> => {
+  await page.addInitScript((): void => {
+    Object.defineProperty(window, 'sessionStorage', { get(): never { throw new DOMException('Storage blocked', 'SecurityError') } })
+  })
+  const { token } = await credentials()
+  await page.goto(`/#token=${token}`)
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Connect backend', exact: true })).toBeVisible()
+  await page.getByLabel('API token', { exact: true }).fill(token)
+  await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+})
+
+/**
+ * Prefers a fresh CLI launch token over a credential from an older backend instance.
+ * @param fixtures Browser page.
+ */
+test('fresh launch replaces a stale saved credential', async ({ page }): Promise<void> => {
+  await page.goto('/')
+  await page.evaluate((): void => { sessionStorage.setItem('sheldon.runtime-token', 'A'.repeat(43)) })
+  const { token } = await credentials()
+  await page.goto('about:blank')
+  await page.goto(`/#token=${token}`)
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('status').filter({ hasText: 'Backend connected' })).toBeVisible()
+})
+
+/**
+ * Clears malformed saved state without attempting authenticated requests.
+ * @param fixtures Browser page.
+ */
+test('malformed saved credential is discarded', async ({ page }): Promise<void> => {
+  await page.goto('/')
+  await page.evaluate((): void => { sessionStorage.setItem('sheldon.runtime-token', 'invalid') })
+  let bearerSent = false
+  page.on('request', (request): void => { if (request.headers().authorization) bearerSent = true })
+  await page.reload()
+  await expect(page.getByRole('status').filter({ hasText: 'Enter the API token from the private instance record.' })).toBeVisible()
+  expect(bearerSent).toBe(false)
+  expect(await page.evaluate((): number => sessionStorage.length)).toBe(0)
+})
+
 test('fixture-only development mode also clears launch fragments without connecting', async ({
   page,
 }) => {
@@ -291,6 +384,9 @@ test('development review routes isolate PRs and ignore cancelled metadata replie
   await expect(page.getByRole('heading', { name: 'Pull request #201' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('registered-development.png'), fullPage: true })
   await page.reload()
+  await expect(page.getByRole('heading', { name: 'Pull request #201' })).toBeVisible()
+  await page.getByRole('button', { name: 'Development backend — Backend connected', exact: true }).click()
+  await page.getByRole('button', { name: 'Disconnect backend', exact: true }).click()
   let release: (() => void) | undefined
   const gate = new Promise<void>((resolve): void => { release = resolve })
   await page.route(`**/api/reviews/${a.prID}`, async (route): Promise<void> => {

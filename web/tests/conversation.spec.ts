@@ -550,7 +550,8 @@ test('two tabs share backend busy feedback but never share drafts', async ({ pag
     await expect(tab.getByRole('button', { name: 'Questions', exact: true })).toBeEnabled()
     const credential = await token()
     expect(await tab.content()).not.toContain(credential)
-    expect(await tab.evaluate((): string => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain(credential)
+    expect(await tab.evaluate((): string => JSON.stringify({ ...localStorage }))).not.toContain(credential)
+    expect(await tab.evaluate((): string | null => sessionStorage.getItem('sheldon.runtime-token'))).toBe(credential)
   }
 })
 
