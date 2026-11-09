@@ -39,6 +39,38 @@ async function completed(view: Locator): Promise<void> {
   await expect(view.getByText('Saving: saved', { exact: true }).last()).toBeVisible()
 }
 
+test('embedded syntax chunks render both palettes under the unchanged release CSP', async ({ page }, info): Promise<void> => {
+  test.setTimeout(120000)
+  const fixture = await offlineCLI({ syntax: true })
+  const failures: string[] = []
+  page.on('console', (message): void => { if (message.type() === 'error') failures.push(message.text()) })
+  page.on('pageerror', (error): void => { failures.push(error.message) })
+  try {
+    await page.goto(await fixture.start('https://github.com/fixture/repo/pull/31'))
+    await load(page)
+    const file = page.getByRole('article', { name: 'Changed file syntax.ts', exact: true })
+    const keyword = file.locator('.syntax-token').filter({ hasText: /^const$/ }).first()
+    await expect(keyword).toHaveCSS('color', 'rgb(255, 143, 64)')
+    await expect(file.locator('code')).toHaveText('export const message: string = "<script>literal</script>"')
+    await expect(file.locator('code[style], code [style], script, img')).toHaveCount(0)
+    const copied = await file.locator('code').evaluate((element): string => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      const selection = window.getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      return selection.toString()
+    })
+    expect(copied).toBe('export const message: string = "<script>literal</script>"')
+    await page.screenshot({ path: info.outputPath('embedded-syntax-ayu-dark.png') })
+    await page.getByRole('button', { name: 'Switch to light theme', exact: true }).click()
+    await expect(keyword).toHaveCSS('color', 'rgb(215, 58, 73)')
+    await page.screenshot({ path: info.outputPath('embedded-syntax-github-light.png') })
+    await expect(page.getByRole('article', { name: 'Changed file shared.txt', exact: true }).locator('.syntax-token')).toHaveCount(0)
+    expect(failures).toEqual([])
+  } finally { await fixture.close() }
+})
+
 test('clean embedded release serves local assets/licenses and contains no development API', async ({ page }): Promise<void> => {
   const record = JSON.parse((await readFile(process.env.SHELDON_RELEASE_STATE!)).subarray(1).toString()) as { url: string; token: string }
   const failures: string[] = []
@@ -58,7 +90,7 @@ test('clean embedded release serves local assets/licenses and contains no develo
   for (const link of await page.locator('.licenses a').all()) {
     const license = await page.request.get(new URL((await link.getAttribute('href'))!, record.url).href)
     expect(license.headers()['content-type']).toContain('text/plain')
-    expect((await license.text()).length).toBeGreaterThan(4000)
+    expect((await license.text()).length).toBeGreaterThan((await link.textContent())?.includes('Syntax highlighting') ? 3000 : 4000)
   }
   for (const script of scripts) expect(await (await page.request.get(script)).text()).not.toMatch(/sheldon-development-api|Deduplicate concurrent session refreshes|requestToken.mockRejectedValueOnce/)
   expect(failures).toEqual([])

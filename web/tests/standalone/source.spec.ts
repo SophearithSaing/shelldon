@@ -144,7 +144,7 @@ test('unsupported library and Overview say Coming soon without fake operations',
   for (const link of await page.locator('.licenses a').all()) {
     const response = await page.request.get((await link.getAttribute('href'))!)
     expect(response.status()).toBe(200)
-    expect(await response.text()).toMatch(/Apache License|SIL OPEN FONT LICENSE/)
+    expect(await response.text()).toMatch(/Apache License|SIL OPEN FONT LICENSE|MIT License/)
   }
   await open(page, 1307)
   await page.getByRole('button', { name: 'Overview', exact: true }).click()

@@ -16,6 +16,7 @@ const q = useConversationContext()
 const chosen = ref<Anchor | undefined>(undefined)
 const file = computed((): SourceDiff['files'][number] | undefined => props.diff.files.find((item): boolean => item.id === props.range.fileID))
 const reference = computed((): SourceReference => ({ revisionID: props.diff.revisionID, anchor: { kind: 'lines', ...props.range }, oldPath: file.value?.oldPath, newPath: file.value?.newPath }))
+const contextLines = computed((): Hunk['lines'] | undefined => file.value?.hunks?.find((item): boolean => item.id === props.range.hunkID)?.lines)
 const excerpt = computed((): Hunk | null => {
   const original = file.value?.hunks?.find((item): boolean => item.id === props.range.hunkID)
   if (!original) return null
@@ -35,7 +36,7 @@ function select(anchor: Anchor): void { if (selectionContext(props.diff, anchor)
 function ask(): void { if (chosen.value) q.navigate({ ...reference.value, anchor: chosen.value }, true) }
 </script>
 
-<template><article class="excerpt" :aria-label="`Semantic excerpt ${file?.newPath ?? file?.oldPath ?? 'unavailable'}`"><template v-if="file && excerpt"><ChangedFileHeader :file="file" :understood="understood" :disabled="!matching" @understood="$emit('understood', $event)"><AppButton variant="quiet" :disabled="!matching || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></ChangedFileHeader><DiffHunk :hunk="excerpt" :file-id="file.id" :selectable="matching" :hunk-selectable="false" :locked="!!q.draft.value" :anchor="chosen" @select="select" /><div v-if="chosen" class="ask"><AppButton variant="primary" :disabled="!matching || !!q.draft.value" @click="ask">Ask about selected range</AppButton></div></template><StatusMessage v-else tone="error">This saved excerpt does not resolve to its original source inventory.</StatusMessage></article></template>
+<template><article class="excerpt" :aria-label="`Semantic excerpt ${file?.newPath ?? file?.oldPath ?? 'unavailable'}`"><template v-if="file && excerpt"><ChangedFileHeader :file="file" :understood="understood" :disabled="!matching" @understood="$emit('understood', $event)"><AppButton variant="quiet" :disabled="!matching || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></ChangedFileHeader><DiffHunk :hunk="excerpt" :context-lines="contextLines" :old-path="file.oldPath" :new-path="file.newPath" :file-id="file.id" :selectable="matching" :hunk-selectable="false" :locked="!!q.draft.value" :anchor="chosen" @select="select" /><div v-if="chosen" class="ask"><AppButton variant="primary" :disabled="!matching || !!q.draft.value" @click="ask">Ask about selected range</AppButton></div></template><StatusMessage v-else tone="error">This saved excerpt does not resolve to its original source inventory.</StatusMessage></article></template>
 
 <style scoped>
 .excerpt { background: var(--paper); margin-bottom: 16px; }

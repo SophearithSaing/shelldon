@@ -14,7 +14,7 @@ defineEmits<{ understood: [id: string] }>()
     <div v-if="file.oldPath && file.newPath && file.oldPath !== file.newPath" class="details">Renamed from {{ file.oldPath }}<span v-if="file.similarity"> · {{ file.similarity }}% similarity</span></div>
     <div v-if="file.oldMode !== file.newMode" class="details">Mode: {{ file.oldMode || 'none' }} → {{ file.newMode || 'none' }}</div>
     <div v-if="file.kind !== 'text'" class="details">{{ file.reason || 'No text diff is available for this change.' }}</div>
-    <div class="patch"><template v-for="hunk in file.hunks ?? []" :key="hunk.id"><QuestionHunk v-if="questions && revisionId" :hunk="hunk" :file-id="file.id" :revision-id="revisionId" /><DiffHunk v-else :hunk="hunk" /></template></div>
+    <div class="patch"><template v-for="hunk in file.hunks ?? []" :key="hunk.id"><QuestionHunk v-if="questions && revisionId" :hunk="hunk" :file-id="file.id" :revision-id="revisionId" :old-path="file.oldPath" :new-path="file.newPath" /><DiffHunk v-else :hunk="hunk" :old-path="file.oldPath" :new-path="file.newPath" /></template></div>
     <div v-if="file.kind === 'text' && !file.hunks?.length" class="details">No changed text lines.</div>
   </article>
 </template>

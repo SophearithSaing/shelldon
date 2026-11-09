@@ -22,10 +22,19 @@ For the real Go backend, use `npm run dev` and the CLI as documented in the root
 | `src/composables/useConversations.ts` | One canonical thread/turn/draft owner shared by inline, panel and saved history |
 | `src/composables/useGeneration.ts` | The finite protocol shared by the two separately owned generation features |
 | `src/api/` | Same-origin transport, public DTOs, exact source selection and API operations |
+| `src/syntax/` | Lazy Shiki grammars, dual-theme tokens and bounded in-memory caching |
 | `src/styles/` | Palette tokens, local fonts and base reset only |
 | `development/` | Server-only fixtures, workers, validation and test scenarios |
 
 Source, initial drafts, follow-up drafts, reading position, understanding and quiz practice are page-memory state. Theme/rail/feature changes retain them. A new displayed source revision resets only file understanding; older conversations/results keep their original identities and quotes. Browser reload/disconnect clears page state, not accepted backend work. Development server restart also resets its in-memory records; real private saving remains Go-owned in OS storage.
+
+## Syntax highlighting
+
+Shiki 4.6.0 colors literal source with **GitHub Light** and **Ayu Dark**, following the app's theme switch. `SyntaxText.vue` renders escaped Vue text spans with external CSS classes, never HTML injection or inline token styles. Diff/selection backgrounds and line identities remain unchanged. The JavaScript regex engine needs neither WASM nor an eval exception in the release CSP. Themes, engine and path-selected grammars load from local bundled chunks; no CDN or backend calls are involved.
+
+The same renderer serves Files changed, semantic excerpts/remainder, conversation context and quiz evidence. Each hunk is tokenized as separate old/new source streams, without diff prefixes. Quotes reuse supplied hunk context when available; discontinuous coordinates reset grammar state. Hunk boundaries still omit full-file context, so coloring is best-effort rather than a parser/validation guarantee.
+
+Supported paths cover TypeScript/TSX, JavaScript/JSX, Vue, Go, Python, Rust, JSON/JSONC, YAML, TOML, HTML, CSS/SCSS, Markdown, shell, SQL, Java, C/C++, Ruby, Dockerfiles and GraphQL. Unknown paths, failed grammar loads and oversized excerpts remain plain text. Highlighting is capped at 1,000 rows / 65,536 UTF-16 code units per excerpt and 2,000 per line; no source is truncated. The token cache retains at most 64 entries / 262,144 key code units in memory. The C++ grammar is a larger lazy chunk (about 797 kB minified); it is not part of initial startup and triggers Vite's size advisory.
 
 ## Public protocol
 

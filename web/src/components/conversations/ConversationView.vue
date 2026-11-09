@@ -15,7 +15,7 @@ const q = useConversationContext()
 <template>
   <section class="conversation" :data-thread="thread.id" :aria-label="inline ? 'Inline conversation' : 'Conversation'">
     <header><span class="anchor">{{ referenceLabel(thread.context) }}</span><span v-if="!q.matching(thread.context)" class="older">Original revision</span><div><AppButton v-if="inline" variant="quiet" @click="q.openPanel(thread)">Open in panel</AppButton><AppButton v-else variant="quiet" :disabled="!q.matching(thread.context) || !!q.draft.value" @click="q.showInline(thread)">Show inline</AppButton><AppButton v-if="inline" variant="quiet" @click="thread.inline = false">Hide inline</AppButton></div></header>
-    <details class="context"><summary>Pinned context</summary><p>{{ thread.context.revision.mergeBaseSHA.slice(0, 8) }} → {{ thread.context.revision.headSHA.slice(0, 8) }}</p><SourceQuote :lines="thread.context.selected" /></details>
+    <details class="context"><summary>Pinned context</summary><p>{{ thread.context.revision.mergeBaseSHA.slice(0, 8) }} → {{ thread.context.revision.headSHA.slice(0, 8) }}</p><SourceQuote :lines="thread.context.selected" :context-lines="thread.context.surrounding.lines" :old-path="thread.context.oldPath" :new-path="thread.context.newPath" /></details>
     <div class="messages" role="log" aria-label="Conversation transcript" aria-live="polite" aria-relevant="additions text">
       <article v-for="answer in thread.answers" :key="answer.answerID" class="exchange">
         <div class="author"><AppIcon name="person" /><strong>You</strong></div><p class="text">{{ answer.question }}</p>

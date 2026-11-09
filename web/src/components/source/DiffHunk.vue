@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { DiffHunk } from '../../api/contracts/source'
+import { computed, ref, toRef } from 'vue'
+import type { DiffHunk, DiffLine } from '../../api/contracts/source'
 import type { Anchor } from '../../api/contracts/questions'
 import AppButton from '../ui/AppButton.vue'
+import SyntaxText from './SyntaxText.vue'
+import { useSyntaxHighlighting } from '../../composables/useSyntaxHighlighting'
 
-const props = withDefaults(defineProps<{ hunk: DiffHunk; fileId?: string; selectable?: boolean; anchor?: Anchor; locked?: boolean; hunkSelectable?: boolean }>(), { selectable: false, locked: false, hunkSelectable: true })
+const props = withDefaults(defineProps<{ hunk: DiffHunk; fileId?: string; oldPath?: string; newPath?: string; contextLines?: DiffLine[]; selectable?: boolean; anchor?: Anchor; locked?: boolean; hunkSelectable?: boolean }>(), { selectable: false, locked: false, hunkSelectable: true })
 const emit = defineEmits<{ select: [anchor: Anchor] }>()
 const origin = ref<{ side: 'old' | 'new'; line: number } | null>(null)
+const syntax = useSyntaxHighlighting(computed((): DiffLine[] => props.contextLines ?? props.hunk.lines), toRef(props, 'oldPath'), toRef(props, 'newPath'))
 
 /**
  * Selects one side within this hunk; Shift extends from the original gutter activation.
@@ -39,7 +42,7 @@ function highlighted(oldLine?: number, newLine?: number): boolean {
   <div class="hunk">
     <div class="hunk-heading"><span>@@ -{{ hunk.old.start }},{{ hunk.old.count }} +{{ hunk.new.start }},{{ hunk.new.count }} @@ {{ hunk.section }}</span><AppButton v-if="selectable && fileId && hunkSelectable" variant="quiet" :disabled="locked" @click="$emit('select', { kind: 'hunk', fileID: fileId, hunkID: hunk.id })">Select hunk</AppButton></div>
     <div class="rows"><template v-for="line in hunk.lines" :key="line.id"><div :data-line="line.id" :class="['line', { added: line.sign === '+', removed: line.sign === '-', selected: highlighted(line.oldLine, line.newLine) }]">
-      <button v-if="selectable && line.oldLine" class="number" :aria-label="`Select old line ${line.oldLine}`" :disabled="locked" @click="select('old', line.oldLine, $event)">{{ line.oldLine }}</button><span v-else class="number" aria-hidden="true">{{ line.oldLine }}</span><button v-if="selectable && line.newLine" class="number" :aria-label="`Select head line ${line.newLine}`" :disabled="locked" @click="select('new', line.newLine, $event)">{{ line.newLine }}</button><span v-else class="number" aria-hidden="true">{{ line.newLine }}</span><span class="sign" aria-hidden="true">{{ line.sign }}</span><code>{{ line.text }}<span v-if="line.noNewline" class="no-newline"> ⏎ No newline at end of file</span></code>
+      <button v-if="selectable && line.oldLine" class="number" :aria-label="`Select old line ${line.oldLine}`" :disabled="locked" @click="select('old', line.oldLine, $event)">{{ line.oldLine }}</button><span v-else class="number" aria-hidden="true">{{ line.oldLine }}</span><button v-if="selectable && line.newLine" class="number" :aria-label="`Select head line ${line.newLine}`" :disabled="locked" @click="select('new', line.newLine, $event)">{{ line.newLine }}</button><span v-else class="number" aria-hidden="true">{{ line.newLine }}</span><span class="sign" aria-hidden="true">{{ line.sign }}</span><code><SyntaxText :text="line.text" :tokens="syntax[line.id]" /><span v-if="line.noNewline" class="no-newline"> ⏎ No newline at end of file</span></code>
     </div><slot name="after-row" :line="line" /></template></div>
   </div>
 </template>

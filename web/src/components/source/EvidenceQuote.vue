@@ -12,7 +12,7 @@ const q = useConversationContext()
 const reference = computed((): SourceReference => ({ revisionID: props.revisionId, anchor: { kind: 'lines', ...props.evidence.anchor }, oldPath: props.evidence.oldPath, newPath: props.evidence.newPath }))
 </script>
 
-<template><section class="evidence"><header><span>{{ referenceLabel(reference) }}</span><AppButton variant="quiet" :disabled="!q.matching(reference) || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></header><SourceQuote :lines="evidence.selected" /></section></template>
+<template><section class="evidence"><header><span>{{ referenceLabel(reference) }}</span><AppButton variant="quiet" :disabled="!q.matching(reference) || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></header><SourceQuote :lines="evidence.selected" :context-lines="evidence.surrounding?.lines" :old-path="evidence.oldPath" :new-path="evidence.newPath" /></section></template>
 
 <style scoped>
 .evidence { margin-top: 16px; }

@@ -9,7 +9,7 @@ import AppButton from '../ui/AppButton.vue'
 import InitialQuestion from './InitialQuestion.vue'
 import ConversationView from './ConversationView.vue'
 
-const props = defineProps<{ hunk: DiffHunk; fileId: string; revisionId: string }>()
+const props = defineProps<{ hunk: DiffHunk; fileId: string; revisionId: string; oldPath?: string; newPath?: string }>()
 const q = useConversationContext()
 const selected = computed((): Anchor | undefined => q.selection.value?.revisionID === props.revisionId && q.selection.value.anchor.hunkID === props.hunk.id ? q.selection.value.anchor : undefined)
 const retained = computed((): Anchor | undefined => q.draft.value?.context.revisionID === props.revisionId && q.draft.value.context.anchor.hunkID === props.hunk.id ? q.draft.value.context.anchor : undefined)
@@ -27,7 +27,7 @@ function endsAt(anchor: Anchor | undefined, line: DiffLine): boolean {
 </script>
 
 <template>
-  <DiffHunkView :hunk="hunk" :file-id="fileId" selectable :anchor="retained ?? selected" :locked="!!q.draft.value" @select="q.select">
+  <DiffHunkView :hunk="hunk" :file-id="fileId" :old-path="oldPath" :new-path="newPath" selectable :anchor="retained ?? selected" :locked="!!q.draft.value" @select="q.select">
     <template #after-row="{ line }">
       <div v-if="!retained && endsAt(selected, line)" class="selection-actions"><AppButton variant="primary" @click="q.compose">Ask about selection</AppButton></div>
       <InitialQuestion v-if="endsAt(retained, line)" />
