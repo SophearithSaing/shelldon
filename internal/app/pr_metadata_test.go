@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -32,10 +33,21 @@ func TestRefreshPRMetadataOffline(t *testing.T) {
 	}
 	paths := testPaths(t)
 	i := ownedPRInstance(t, paths.Data)
-	pr, _ := i.RegisterPR("https://github.com/owner/repo/pull/31")
-	row, err := i.RefreshPRMetadata(context.Background(), pr)
-	if err != nil || row.State != "open" || row.PR.Title == nil || *row.PR.Title != "Refreshed title" {
-		t.Fatalf("refresh: %+v %v", row, err)
+	s := questionHTTP(t, questionFixture{owner: i, service: &sourceRegistry{instance: i, paths: paths}})
+	registration := questionPost(t, context.Background(), s, "/api/open", map[string]string{"url": "https://github.com/owner/repo/pull/31"})
+	if registration.StatusCode != 202 {
+		t.Fatalf("registration: %d", registration.StatusCode)
+	}
+	pr, _ := i.ReadPR(mustPRID(t, "https://github.com/owner/repo/pull/31"))
+	initial := historyGET(t, s, "/api/reviews")
+	var initialList githubpr.LibraryResult
+	if initial.StatusCode != 200 || json.NewDecoder(initial.Body).Decode(&initialList) != nil || initialList.Counts.Unknown != 1 {
+		t.Fatal("new registration missing from local library")
+	}
+	response := questionPost(t, context.Background(), s, "/api/reviews/"+pr.ID+"/metadata/refresh", map[string]any{})
+	var row githubpr.LibraryRow
+	if response.StatusCode != 200 || json.NewDecoder(response.Body).Decode(&row) != nil || row.State != "open" || row.PR.Title == nil || *row.PR.Title != "Refreshed title" {
+		t.Fatalf("refresh: %d %+v", response.StatusCode, row)
 	}
 	file := filepath.Join(paths.Data, "reviews", pr.ID, "pr-metadata.json")
 	before, _ := os.ReadFile(file)
@@ -68,4 +80,31 @@ func TestRefreshPRMetadataOffline(t *testing.T) {
 	if _, err := os.Stat(paths.Cache); !os.IsNotExist(err) {
 		t.Fatal("metadata refresh initialized source")
 	}
+	if err := s.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := i.close(); err != nil {
+		t.Fatal(err)
+	}
+	i = ownedPRInstance(t, paths.Data)
+	t.Setenv("PATH", t.TempDir())
+	s = questionHTTP(t, questionFixture{owner: i, service: &sourceRegistry{instance: i, paths: paths}})
+	listed := historyGET(t, s, "/api/reviews?q=REFRESHED&state=open")
+	var result githubpr.LibraryResult
+	if listed.StatusCode != 200 || json.NewDecoder(listed.Body).Decode(&result) != nil || result.Total != 1 || result.Items[0].PR.ID != pr.ID {
+		t.Fatalf("restart list: %d %+v", listed.StatusCode, result)
+	}
+	reopened := historyGET(t, s, "/api/reviews/"+pr.ID)
+	if reopened.StatusCode != 200 || i.cache != nil || i.questions != nil || i.quizzes != nil || i.semantics != nil {
+		t.Fatal("source-free reopening failed or started services")
+	}
+}
+
+func mustPRID(t *testing.T, raw string) string {
+	t.Helper()
+	pr, err := githubpr.ParseURL(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pr.ID
 }
