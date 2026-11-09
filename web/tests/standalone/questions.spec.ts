@@ -1,0 +1,151 @@
+import { expect, test } from '@playwright/test'
+import { ask, completed, compose, load, open } from './helpers'
+
+test('initial send, inline/panel drafts and streamed follow-ups use one canonical thread', async ({ page }, info): Promise<void> => {
+  await open(page, 1401)
+  await load(page)
+  let admissions = 0
+  let observations = 0
+  page.on('request', (request): void => {
+    if (request.method() === 'POST' && /\/(questions|answers)$/.test(request.url())) admissions++
+    if (request.url().endsWith('/events')) observations++
+  })
+  const initial = await compose(page)
+  const draft = initial.getByRole('textbox', { name: 'Your question', exact: true })
+  await draft.fill('Explain the cleanup boundary.')
+  await draft.press('Enter')
+  expect(admissions).toBe(0)
+  await draft.press('Control+Enter')
+  const inline = page.getByRole('region', { name: 'Inline conversation', exact: true })
+  await expect(inline).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open conversations panel', exact: true })).toBeVisible()
+  await completed(inline)
+  await inline.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).fill('Keep this shared draft')
+  await inline.getByRole('button', { name: 'Open in panel', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Conversation', exact: true })
+  await expect(panel.getByRole('textbox', { name: 'Follow up in this thread', exact: true })).toHaveValue('Keep this shared draft')
+  await panel.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).press('Shift+Enter')
+  await panel.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).pressSequentially('And the failure case?')
+  await expect(inline.getByRole('textbox', { name: 'Follow up in this thread', exact: true })).toHaveValue('Keep this shared draft\nAnd the failure case?')
+  await page.screenshot({ path: info.outputPath('inline-and-panel-dark.png') })
+  await page.getByRole('button', { name: 'Switch to light theme', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('inline-and-panel-light.png') })
+  await panel.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).press('Enter')
+  await expect(inline.getByText('Execution: completed', { exact: true })).toHaveCount(2)
+  expect(admissions).toBe(2)
+  expect(observations).toBe(2)
+  await expect(page.getByRole('progressbar', { name: 'Files marked understood' })).toHaveAttribute('value', '0')
+})
+
+test('cancel retains one pinned initial draft across files/features and source refresh is guarded', async ({ page }): Promise<void> => {
+  await open(page, 1402)
+  await load(page)
+  const initial = await compose(page)
+  await initial.getByRole('textbox', { name: 'Your question', exact: true }).fill('Keep this exact original range.')
+  await initial.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Refresh source', exact: true })).toBeDisabled()
+  await page.getByRole('navigation', { name: 'Changed files', exact: true }).getByRole('button', { name: 'src/auth/store.ts M', exact: true }).click()
+  await expect(page.getByRole('article', { name: 'Changed file src/auth/store.ts', exact: true }).getByRole('button', { name: 'Select head line 9', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Questions', exact: true }).click()
+  await page.getByRole('button', { name: 'Resume question', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Initial source question', exact: true }).getByRole('textbox')).toHaveValue('Keep this exact original range.')
+  await expect(page.getByRole('region', { name: 'Initial source question', exact: true }).getByRole('textbox')).toBeFocused()
+  page.once('dialog', async (dialog): Promise<void> => { await dialog.accept() })
+  await page.getByRole('region', { name: 'Initial source question', exact: true }).getByRole('button', { name: 'Discard draft', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Refresh source', exact: true })).toBeEnabled()
+})
+
+test('other tabs receive busy rejection without phantom transcripts or lost drafts', async ({ page, context }): Promise<void> => {
+  const other = await context.newPage()
+  await open(page, 1403)
+  await load(page)
+  await open(other, 1403)
+  await load(other)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'answer-slow' })
+  const inline = await ask(page)
+  const second = await compose(other)
+  await second.getByRole('textbox').fill('Retain the rejected question.')
+  await second.getByRole('button', { name: 'Send question', exact: true }).click()
+  await expect(second.getByRole('alert')).toContainText('Another question is active')
+  await expect(other.getByRole('region', { name: 'Inline conversation', exact: true })).toHaveCount(0)
+  await expect(second.getByRole('textbox')).toHaveValue('Retain the rejected question.')
+  await inline.getByRole('button', { name: 'Stop this answer', exact: true }).click()
+  await expect(inline.getByText('Execution: interrupted', { exact: true })).toBeVisible()
+  await second.getByRole('button', { name: 'Send question', exact: true }).click()
+  await completed(other.getByRole('region', { name: 'Inline conversation', exact: true }))
+})
+
+test('save failure retains text and retry saving dispatches no new question', async ({ page }): Promise<void> => {
+  await open(page, 1404)
+  await load(page)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'answer-save-failed' })
+  let admissions = 0
+  page.on('request', (request): void => { if (request.url().endsWith('/questions')) admissions++ })
+  const inline = await ask(page)
+  await expect(inline.getByText('Execution: completed', { exact: true })).toBeVisible()
+  await expect(inline.getByText('Saving: failed', { exact: true })).toBeVisible()
+  await expect(inline.getByRole('button', { name: 'Send follow-up', exact: true })).toBeDisabled()
+  await inline.getByRole('button', { name: 'Retry saving', exact: true }).click()
+  await completed(inline)
+  expect(admissions).toBe(1)
+  await page.getByRole('button', { name: 'Questions', exact: true }).click()
+  await page.getByRole('button', { name: 'Refresh saved questions', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Saved question threads', exact: true }).getByRole('button').click()
+  await expect(page.getByRole('region', { name: 'Conversation', exact: true })).toContainText('single in-flight refresh')
+})
+
+test('stream loss reconnects observation of the original answer without resending', async ({ page }): Promise<void> => {
+  await open(page, 1405)
+  await load(page)
+  let admissions = 0
+  page.on('request', (request): void => { if (request.url().endsWith('/questions')) admissions++ })
+  await page.route('**/events', async (route): Promise<void> => { await route.fulfill({ contentType: 'text/event-stream', body: '' }) })
+  const inline = await ask(page)
+  await expect(inline.getByRole('button', { name: 'Reconnect answer observation', exact: true })).toBeVisible()
+  await page.unroute('**/events')
+  await inline.getByRole('button', { name: 'Reconnect answer observation', exact: true }).click()
+  await completed(inline)
+  expect(admissions).toBe(1)
+})
+
+test('uncertain admission disables resending and saved history observes only accepted work', async ({ page }): Promise<void> => {
+  await open(page, 1406)
+  await load(page)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'admission-uncertain' })
+  let admissions = 0
+  page.on('request', (request): void => { if (request.url().endsWith('/questions')) admissions++ })
+  const initial = await compose(page)
+  await initial.getByRole('textbox').fill('Find the accepted original answer.')
+  await initial.getByRole('button', { name: 'Send question', exact: true }).click()
+  await expect(initial.getByRole('alert')).toContainText('admission is uncertain')
+  await expect(initial.getByRole('button', { name: 'Send question', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Questions', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Saved question threads', exact: true }).getByRole('button').click()
+  await completed(page.getByRole('region', { name: 'Conversation', exact: true }))
+  expect(admissions).toBe(1)
+})
+
+test('saved questions reopen after reload without source loading and explicitly continue original scope', async ({ page }): Promise<void> => {
+  await open(page, 1407)
+  await load(page)
+  await completed(await ask(page))
+  let sourceRequests = 0
+  let admissions = 0
+  page.on('request', (request): void => {
+    if (request.url().endsWith('/source')) sourceRequests++
+    if (/\/(questions|answers)$/.test(request.url())) admissions++
+  })
+  await page.reload()
+  await page.getByRole('button', { name: 'Questions', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Saved question threads', exact: true }).getByRole('button').click()
+  const view = page.getByRole('region', { name: 'Conversation', exact: true })
+  await expect(view.getByRole('button', { name: 'Show inline', exact: true })).toBeDisabled()
+  await expect(view).toContainText('single in-flight refresh')
+  expect(sourceRequests).toBe(0)
+  expect(admissions).toBe(0)
+  await view.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).fill('Continue the original session explicitly.')
+  await view.getByRole('textbox', { name: 'Follow up in this thread', exact: true }).press('Enter')
+  await expect(view.getByText('Execution: completed', { exact: true })).toHaveCount(2)
+  expect(sourceRequests).toBe(0)
+  expect(admissions).toBe(1)
+})

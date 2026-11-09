@@ -2,7 +2,7 @@
 import type { PullRequest, SourceDiff } from '../../api/contracts/source'
 import AppButton from '../ui/AppButton.vue'
 
-defineProps<{ pr: PullRequest; source: SourceDiff | null; pending: boolean }>()
+defineProps<{ pr: PullRequest; source: SourceDiff | null; pending: boolean; refreshBlocked?: boolean }>()
 defineEmits<{ refresh: [] }>()
 </script>
 
@@ -10,7 +10,7 @@ defineEmits<{ refresh: [] }>()
   <section class="review-header" aria-label="Pull request context">
     <span class="repository">{{ pr.owner }} / {{ pr.repository }} /</span>
     <h1 :title="pr.title ?? `Pull request #${pr.number}`">{{ pr.title ?? 'Pull request' }} <span>#{{ pr.number }}</span></h1>
-    <AppButton v-if="source" :disabled="pending" @click="$emit('refresh')">{{ pending ? 'Refreshing…' : 'Refresh source' }}</AppButton>
+    <AppButton v-if="source" :disabled="pending || refreshBlocked" :title="refreshBlocked ? 'Finish or discard the retained initial question before refreshing source.' : undefined" @click="$emit('refresh')">{{ pending ? 'Refreshing…' : 'Refresh source' }}</AppButton>
     <details class="details"><summary>Details</summary><div class="metadata"><a :href="pr.url" target="_blank" rel="noreferrer">Open on GitHub</a><span v-if="pr.author">Author: {{ pr.author }}</span><template v-if="source"><span>Base: {{ source.revision.baseBranch }}</span><code>{{ source.revision.mergeBaseSHA.slice(0, 8) }} → {{ source.revision.headSHA.slice(0, 8) }}</code></template></div></details>
   </section>
 </template>

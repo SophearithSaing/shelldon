@@ -1,0 +1,130 @@
+import { expect, test } from '@playwright/test'
+import { ask, completed, compose, generate, load, open } from './helpers'
+
+test('large comparison keeps complete inventory while mounting source incrementally', async ({ page }, info): Promise<void> => {
+  await open(page, 1601)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'large-source' })
+  await load(page, 80)
+  const rows = await page.locator('.pinned-diff code').count()
+  expect(rows).toBeLessThan(250)
+  let loads = 0
+  page.on('request', (request): void => { if (request.url().endsWith('/source')) loads++ })
+  await page.getByRole('searchbox', { name: 'Filter files', exact: true }).fill('file-79')
+  await page.getByRole('navigation', { name: 'Changed files', exact: true }).getByRole('button', { name: 'src/generated/file-79.ts M', exact: true }).click()
+  const last = page.getByRole('article', { name: 'Changed file src/generated/file-79.ts', exact: true })
+  await expect(last.locator('code').first()).toBeVisible()
+  await expect(last.getByRole('heading')).toBeFocused()
+  await page.getByRole('searchbox', { name: 'Filter files', exact: true }).fill('src/auth/refresh')
+  await page.getByRole('navigation', { name: 'Changed files', exact: true }).getByRole('button', { name: 'src/auth/refresh.ts M', exact: true }).click()
+  await expect(last.locator('code').first()).toBeAttached()
+  expect(loads).toBe(0)
+  await page.screenshot({ path: info.outputPath('large-inventory.png') })
+})
+
+test('explicit Git-only decisions retain the selected base through refresh', async ({ page }): Promise<void> => {
+  await open(page, 1602)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'source-fallback' })
+  await page.getByRole('button', { name: 'Load pinned source', exact: true }).click()
+  await page.getByRole('button', { name: 'Use Git-only fallback', exact: true }).click()
+  await page.getByRole('button', { name: 'Load main', exact: true }).click()
+  await expect(page.getByRole('article', { name: /^Changed file / })).toHaveCount(3)
+  const response = page.waitForResponse((candidate): boolean => candidate.url().endsWith('/source') && candidate.request().postDataJSON().action === 'refresh')
+  await page.getByRole('button', { name: 'Refresh source', exact: true }).click()
+  expect((await (await response).json()).diff.revision.baseSource).toBe('user-selected')
+})
+
+test('empty and non-text comparisons remain complete and have no line questions', async ({ page }): Promise<void> => {
+  await open(page, 1603)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'source-empty' })
+  await load(page, 0)
+  await expect(page.getByText('No changed files in this comparison.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('progressbar', { name: 'Files marked understood' })).toHaveAttribute('value', '0')
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'source-nontext' })
+  await page.getByRole('button', { name: 'Refresh source', exact: true }).click()
+  const image = page.getByRole('article', { name: 'Changed file assets/diagram.png', exact: true })
+  await expect(image).toContainText('Binary file added.')
+  await expect(image.getByRole('button', { name: /Select / })).toHaveCount(0)
+})
+
+test('old-side Shift ranges stay in one hunk and native text selection starts no work', async ({ page }): Promise<void> => {
+  await open(page, 1604)
+  await load(page)
+  let admissions = 0
+  page.on('request', (request): void => { if (request.url().endsWith('/questions')) admissions++ })
+  const file = page.getByRole('article', { name: 'Changed file src/auth/refresh.ts', exact: true })
+  const literal = await file.locator('code').first().evaluate((element): string => {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    return selection.toString()
+  })
+  expect(literal).toContain('sessionStore')
+  expect(admissions).toBe(0)
+  await file.getByRole('button', { name: 'Select old line 16', exact: true }).click()
+  await file.getByRole('button', { name: 'Select old line 18', exact: true }).click({ modifiers: ['Shift'] })
+  await file.getByRole('button', { name: 'Ask about selection', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Initial source question', exact: true })).toContainText('Old L16–18')
+  expect(admissions).toBe(0)
+})
+
+test('IME composition never submits initial or follow-up input', async ({ page }): Promise<void> => {
+  await open(page, 1605)
+  await load(page)
+  let admissions = 0
+  page.on('request', (request): void => { if (/\/(questions|answers)$/.test(request.url())) admissions++ })
+  const initial = await compose(page)
+  const input = initial.getByRole('textbox')
+  await input.fill('入力中の質問')
+  await input.dispatchEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true })
+  expect(admissions).toBe(0)
+  await initial.getByRole('button', { name: 'Send question', exact: true }).click()
+  const inline = page.getByRole('region', { name: 'Inline conversation', exact: true })
+  await completed(inline)
+  const followup = inline.getByRole('textbox')
+  await followup.fill('確認中')
+  await followup.dispatchEvent('keydown', { key: 'Enter', isComposing: true })
+  expect(admissions).toBe(1)
+})
+
+test('failed and unknown answers never imply completion, approval or safe continuation', async ({ page }): Promise<void> => {
+  await open(page, 1606)
+  await load(page)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'answer-failed' })
+  const failed = await ask(page)
+  await expect(failed.getByText('Execution: failed', { exact: true })).toBeVisible()
+  await failed.getByRole('textbox').fill('Keep this follow-up draft.')
+  await page.getByRole('button', { name: 'Questions', exact: true }).click()
+  await page.getByRole('button', { name: 'Refresh saved questions', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Saved question threads', exact: true }).getByRole('button').click()
+  await expect(page.getByRole('region', { name: 'Conversation', exact: true }).getByRole('textbox')).toHaveValue('Keep this follow-up draft.')
+  await page.getByRole('button', { name: /^Files changed/ }).click()
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'answer-unknown' })
+  await failed.getByRole('textbox').press('Enter')
+  await expect(failed.getByText('Execution outcome unknown', { exact: true })).toBeVisible()
+  await failed.getByRole('textbox').fill('Do not dispatch this again.')
+  await expect(failed.getByRole('button', { name: 'Send follow-up', exact: true })).toBeDisabled()
+})
+
+test('semantic source-free, narrow and enlarged-text states keep controls reachable', async ({ page }, info): Promise<void> => {
+  await open(page, 1607)
+  await load(page)
+  await generate(page, 'semantic')
+  await page.getByRole('button', { name: 'Switch to light theme', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('semantic-light.png') })
+  await page.setViewportSize({ width: 700, height: 1000 })
+  await expect(page.getByRole('button', { name: 'Collapse groups panel', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Collapse groups panel', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('semantic-narrow.png'), fullPage: true })
+  await page.setViewportSize({ width: 1440, height: 1080 })
+  await page.evaluate((): void => {
+    const sizes = [...document.querySelectorAll<HTMLElement>('body *')].map((element): { element: HTMLElement; size: number; line: number } => ({ element, size: Number.parseFloat(getComputedStyle(element).fontSize), line: Number.parseFloat(getComputedStyle(element).lineHeight) }))
+    for (const { element, size, line } of sizes) {
+      element.style.fontSize = `${size * 2}px`
+      if (Number.isFinite(line)) element.style.lineHeight = `${line * 2}px`
+    }
+  })
+  await page.screenshot({ path: info.outputPath('semantic-enlarged-text.png'), fullPage: true })
+  expect(await page.evaluate((): boolean => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})

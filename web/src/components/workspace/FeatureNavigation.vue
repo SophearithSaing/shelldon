@@ -1,12 +1,12 @@
 <script setup lang="ts">
 export type Feature = 'overview' | 'files' | 'questions' | 'quiz' | 'semantic'
-defineProps<{ selected: Feature; fileCount?: number }>()
+defineProps<{ selected: Feature; fileCount?: number; quizCount?: number; semanticCount?: number }>()
 defineEmits<{ select: [feature: Feature] }>()
 const features: { id: Feature; label: string }[] = [{ id: 'overview', label: 'Overview' }, { id: 'files', label: 'Files changed' }, { id: 'questions', label: 'Questions' }, { id: 'quiz', label: 'Quiz' }, { id: 'semantic', label: 'Semantic review' }]
 </script>
 
 <template>
-  <nav class="features" aria-label="Review features"><button v-for="feature in features" :key="feature.id" :aria-current="selected === feature.id ? 'page' : undefined" @click="$emit('select', feature.id)">{{ feature.label }}<span v-if="feature.id === 'files' && fileCount !== undefined">{{ fileCount }}</span></button></nav>
+  <nav class="features" aria-label="Review features"><button v-for="feature in features" :key="feature.id" :aria-current="selected === feature.id ? 'page' : undefined" @click="$emit('select', feature.id)">{{ feature.label }}<span v-if="feature.id === 'files' && fileCount !== undefined">{{ fileCount }}</span><span v-if="feature.id === 'quiz' && quizCount !== undefined">{{ quizCount }}</span><span v-if="feature.id === 'semantic' && semanticCount !== undefined">{{ semanticCount }}</span></button></nav>
 </template>
 
 <style scoped>

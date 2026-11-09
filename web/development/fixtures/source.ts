@@ -52,10 +52,11 @@ function hunk(key: string, oldStart: number, newStart: number, rows: string[]): 
 /**
  * Creates a complete pinned comparison for a registered PR.
  * @param pr Registered PR.
+ * @param options Optional comparison/inventory scenario.
  * @returns Deterministic comparison.
  */
-export function sourceFixture(pr: PullRequest): SourceDiff {
-  const revision = { prID: pr.id, baseBranch: 'main', baseSource: 'github' as const, baseSHA: 'a'.repeat(40), headSHA: 'b'.repeat(40), mergeBaseSHA: 'a'.repeat(40) }
+export function sourceFixture(pr: PullRequest, options: { headSHA?: string; fileCount?: number } = {}): SourceDiff {
+  const revision = { prID: pr.id, baseBranch: 'main', baseSource: 'github' as const, baseSHA: 'a'.repeat(40), headSHA: options.headSHA ?? 'b'.repeat(40), mergeBaseSHA: 'a'.repeat(40) }
   const revisionID = digest([pr.id, revision.baseSHA, revision.headSHA, revision.mergeBaseSHA].join('\n'))
   const paths = ['src/auth/refresh.ts', 'src/auth/store.ts', 'tests/auth/refresh.test.ts']
   const rows = [
@@ -74,6 +75,9 @@ export function sourceFixture(pr: PullRequest): SourceDiff {
       '+it("shares the refresh between concurrent callers", async () => {', '+  const first = refreshSession();', '+  const second = refreshSession();', '+', '+  expect(requestToken).toHaveBeenCalledTimes(1);', '+  expect(await first).toBe(await second);', '+});', '+', '+it("allows retry after a failed refresh", async () => {', '+  requestToken.mockRejectedValueOnce(new Error("offline"));', '+  await expect(refreshSession()).rejects.toThrow("offline");', '+  await refreshSession();', '+  expect(requestToken).toHaveBeenCalledTimes(2);', '+});',
     ],
   ]
-  const files = paths.map((path, index): DiffFile => ({ id: digest(`${revisionID}:${path}`), status: 'modified', oldPath: path, newPath: path, oldMode: '100644', newMode: '100644', oldObject: 'c'.repeat(40), newObject: 'd'.repeat(40), kind: 'text', hunks: [hunk(`${revisionID}:${path}:hunk`, index === 0 ? 12 : 1, index === 0 ? 12 : 1, rows[index]!)] }))
+  const files = Array.from({ length: options.fileCount ?? paths.length }, (_, index): DiffFile => {
+    const path = paths[index] ?? `src/generated/file-${index}.ts`
+    return { id: digest(`${revisionID}:${path}`), status: 'modified', oldPath: path, newPath: path, oldMode: '100644', newMode: '100644', oldObject: 'c'.repeat(40), newObject: 'd'.repeat(40), kind: 'text', hunks: [hunk(`${revisionID}:${path}:hunk`, index % 3 === 0 ? 12 : 1, index % 3 === 0 ? 12 : 1, rows[index % 3]!)] }
+  })
   return { revision, revisionID, complete: true, files }
 }

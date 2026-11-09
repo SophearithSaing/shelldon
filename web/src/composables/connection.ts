@@ -1,5 +1,6 @@
 import { readonly, ref } from 'vue'
 import { json, setCredential } from '../api/client'
+import { allowPageLeave } from './navigation'
 
 const connected = ref(false)
 const checking = ref(false)
@@ -56,6 +57,7 @@ export async function connect(token: string): Promise<void> {
 
 /** Disconnects browser access without cancelling accepted backend work. */
 export function disconnect(): void {
+  if (!allowPageLeave()) return
   connected.value = false
   setCredential('')
   if (requiresCredential) { try { sessionStorage.removeItem(storageKey) } catch {} }
