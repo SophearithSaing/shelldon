@@ -9,9 +9,7 @@
     "test:standalone": "playwright test --config playwright.standalone.config.ts",
     "test:backend": "playwright test --config playwright.backend.config.ts",
     "test": "playwright test",
-    "test:legacy": "playwright test --config playwright.legacy.config.ts",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
-    "typecheck:legacy": "tsc --noEmit -p tsconfig.legacy.json",
     "typecheck:standalone": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.standalone.json",
     "build": "npm run typecheck && vite build"
   },

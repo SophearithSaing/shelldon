@@ -70,7 +70,7 @@ Test tooling can select the same scenarios per request with `X-Sheldon-Scenario`
 
 Accepted local workers run independently of observers. Submitted questions and terminal saved answers are distinct in-memory records; partial streaming text is not periodically written. Server shutdown stops owned development workers. These are development semantics, not proof of OS/power-loss durability or real provider behavior.
 
-## Verification and migration limits
+## Verification and limits
 
 ```sh
 npm run typecheck
@@ -84,12 +84,4 @@ npm run test:release        # disposable clean embedded build + actual Git/API/p
 
 The clean-release suite reuses offline Git/transport/native-protocol tools, not application HTTP mocks. It exercises durable questions, targeted Stop, original-session continuation after app/service restart, quiz checking/cancelled replacement, semantic-to-source questions and saved quiz/groups with original cache/native tools unavailable. Application processes run without Node or `refs/`. Synthetic native answers do not certify live provider compatibility or factual explanation/grouping quality.
 
-The frontend reset removed modules referenced by historical browser suites. Their files/assertions are preserved, not replaced by production compatibility stubs. Current defaults typecheck/run the rebuilt application and new suites; historical suites are explicitly retained as migration references:
-
-```sh
-npm run typecheck:legacy
-npm run test:web:legacy
-npm run test:release:legacy
-```
-
-Those historical commands are not current passing gates; they still depend on removed UI/modules. Passing current checks is **not** a claim that all historical tests or accessibility/platform cases have been ported. Keep this coverage gap explicit when expanding the application. Linux/Chromium offline checks establish neither native non-Linux support, live inference quality, exactly-once dispatch nor a sandbox.
+Linux/Chromium offline checks do not certify screen-reader accessibility, native non-Linux support, live inference quality, exactly-once dispatch or a sandbox.

@@ -21,10 +21,7 @@
     "typecheck": "npm run typecheck --workspace=@sheldon/web",
     "typecheck:web": "npm run typecheck:standalone --workspace=@sheldon/web",
     "test:web": "npm run test --workspace=@sheldon/web && npm run test:web:backend && npm run test:web:contracts",
-    "test:web:legacy": "npm run test:legacy --workspace=@sheldon/web",
-    "typecheck:legacy": "npm run typecheck:legacy --workspace=@sheldon/web",
     "test:release": "npm run test --workspace=@sheldon/web -- --config playwright.release.config.ts",
-    "test:release:legacy": "npm run test --workspace=@sheldon/web -- --config playwright.release.legacy.config.ts",
     "build:web": "npm run build --workspace=@sheldon/web"
   }
 }
