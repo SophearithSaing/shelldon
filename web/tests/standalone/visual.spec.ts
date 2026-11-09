@@ -1,6 +1,35 @@
 import { expect, test } from '@playwright/test'
 import { load, open } from './helpers'
 
+test('home screen encourages deliberate review and serves its turtle favicon locally', async ({ page }, info): Promise<void> => {
+  await page.goto('/')
+  const heading = page.getByRole('heading', { level: 1 })
+  await expect(heading).toContainText('Slow down.')
+  await expect(heading).toContainText('Understand the changes.')
+  await expect(page.getByText('READ. ASK. UNDERSTAND.', { exact: true })).toBeVisible()
+  const favicon = page.locator('link[rel="icon"][sizes="32x32"]')
+  await expect(favicon).toHaveAttribute('type', 'image/png')
+  await expect(favicon).toHaveAttribute('sizes', '32x32')
+  const iconURL = await favicon.evaluate((link): string => (link as HTMLLinkElement).href)
+  expect(new URL(iconURL).origin).toBe(new URL(page.url()).origin)
+  const icon = await page.request.get(iconURL)
+  expect(icon.status()).toBe(200)
+  expect(icon.headers()['content-type']).toContain('image/png')
+  const bytes = await icon.body()
+  expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([32, 32])
+  const largeIconURL = await page.locator('link[rel="icon"][sizes="64x64"]').evaluate((link): string => (link as HTMLLinkElement).href)
+  const largeIcon = await page.request.get(largeIconURL)
+  expect(largeIcon.status()).toBe(200)
+  const largeBytes = await largeIcon.body()
+  expect([largeBytes.readUInt32BE(16), largeBytes.readUInt32BE(20)]).toEqual([64, 64])
+  await page.screenshot({ path: info.outputPath('home-slow-down-dark.png') })
+  await page.getByRole('button', { name: 'Switch to light theme', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('home-slow-down-light.png') })
+  await page.setViewportSize({ width: 700, height: 800 })
+  await expect(heading).toBeInViewport()
+  await page.screenshot({ path: info.outputPath('home-slow-down-narrow.png'), fullPage: true })
+})
+
 for (const feature of ['quiz', 'semantic'] as const) test(`${feature} start content sits above center and stays reachable on short screens`, async ({ page }, info): Promise<void> => {
   await page.setViewportSize({ width: 1440, height: 960 })
   await open(page, feature === 'quiz' ? 1803 : 1804)

@@ -32,7 +32,7 @@ onBeforeUnmount((): void => controller.abort())
 <template>
   <section class="open-review">
     <span class="eyebrow">READ. ASK. UNDERSTAND.</span>
-    <h1>Don't just merge it.<br /><span>Understand it.</span></h1>
+    <h1>Slow down.<br /><span>Understand the changes.</span></h1>
     <p>Bring a pull request. Explore the changes, ask at the source, and build your understanding.</p>
     <form @submit.prevent="submit">
       <label for="pr-url">Open a pull request</label>
