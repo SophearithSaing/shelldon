@@ -4,6 +4,8 @@
 
 A local pull-request explainer. **Pinned Files changed + saved questions/follow-ups + separate fictional UI previews**—submitted questions and finished answers are saved locally with explicit save-failure feedback and PR-local reopening.
 
+**Frontend rebuild:** the current Vue source implements PR entry and pinned Files changed with component-owned styles. Conversations, saved Questions, Quiz and Semantic review are not yet rebuilt; library and Overview also remain Coming soon. The detailed flows below describe existing backend contracts and the previous UI, not completed functionality in the rebuilt frontend.
+
 ## Toolchains
 
 Go **1.26.5** · Node **26.5.0** · npm **11.17.0**
@@ -11,6 +13,26 @@ Go **1.26.5** · Node **26.5.0** · npm **11.17.0**
 Browser checks also need Playwright Chromium and its system libraries. Tests use offline fixtures, not provider logins or paid requests. Real source loading needs native Git and existing repository access; optional authenticated `gh` resolves the actual PR target. No harness is needed for source browsing. Real questions require an already-installed **OpenCode 2.1.4** with existing provider/default-model configuration; Sheldon does not install or configure it. Current question integration evidence is offline, not a live-provider compatibility claim.
 
 ## Develop
+
+Frontend only, with an in-memory development HTTP API and seeded source:
+
+```sh
+npm ci --ignore-scripts
+npm run dev:web
+```
+
+Open <http://127.0.0.1:5173>, enter a GitHub PR URL (for example `https://github.com/acme/platform/pull/248`), then choose **Load pinned source**. This command uses no Go, Git, harness or credentials. Restarting the server resets its development records; reloading the page resets source/understanding but can reopen an already registered PR. Data and middleware live under `web/development/`, outside the production asset graph. The real-backend mode never falls back to development data.
+
+Current rebuild checks (no native tools required):
+
+```sh
+npm run typecheck:web
+npm run test:web:standalone
+```
+
+The original `npm run typecheck` and `npm run test:web` remain available; historical tests still reference modules removed by the frontend reset and are being migrated without discarding their behavioral coverage.
+
+For development against the real backend, keep using two terminals:
 
 ```sh
 npm ci --ignore-scripts
