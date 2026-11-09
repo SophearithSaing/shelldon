@@ -142,6 +142,11 @@ func (i *instance) questionDirectory(prID string, create bool) (*os.Root, error)
 	if _, err := i.ReadPR(prID); err != nil {
 		return nil, errQuestionStore
 	}
+	return i.registeredReviewDirectory(prID, create)
+}
+
+// registeredReviewDirectory opens checked parents after the caller verifies writer membership.
+func (i *instance) registeredReviewDirectory(prID string, create bool) (*os.Root, error) {
 	dataDir := filepath.Dir(i.file.Name())
 	info, err := os.Lstat(dataDir)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
