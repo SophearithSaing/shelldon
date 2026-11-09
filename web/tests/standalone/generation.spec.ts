@@ -110,7 +110,7 @@ test('quiz and semantic generation remain separate and accepted work continues a
   expect(admissions).toBe(0)
 })
 
-test('semantic groups share file understanding and selected-range Ask opens the original composer without dispatch', async ({ page }, info): Promise<void> => {
+test('semantic groups share file understanding and gutter activation opens the original composer without dispatch', async ({ page }, info): Promise<void> => {
   await open(page, 1506)
   await load(page)
   let admissions = 0
@@ -122,8 +122,7 @@ test('semantic groups share file understanding and selected-range Ask opens the 
   const second = page.getByRole('article', { name: 'Semantic excerpt src/auth/refresh.ts', exact: true })
   await expect(second.getByRole('button', { name: 'Unmark understood src/auth/refresh.ts', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.screenshot({ path: info.outputPath('semantic-dark.png') })
-  await second.getByRole('button', { name: 'Select head line 26', exact: true }).click()
-  await second.getByRole('button', { name: 'Ask about selected range', exact: true }).click()
+  await second.getByRole('button', { name: 'Ask about head line 26', exact: true }).click()
   const initial = page.getByRole('region', { name: 'Initial source question', exact: true })
   await expect(initial).toContainText('Head L26–26')
   await expect(initial.getByRole('textbox')).toBeFocused()

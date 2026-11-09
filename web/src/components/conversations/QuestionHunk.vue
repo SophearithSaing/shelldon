@@ -16,7 +16,7 @@ const retained = computed((): Anchor | undefined => q.draft.value?.context.revis
 const matchingThreads = computed((): ConversationThread[] => q.threads.value.filter((thread): boolean => thread.context.revisionID === props.revisionId && thread.context.anchor.hunkID === props.hunk.id))
 
 /**
- * Opens the retained source composer directly after a supported line click or completed drag.
+ * Opens the retained source composer directly after line-number activation or a gutter drag.
  * @param anchor Exact gesture range.
  */
 function ask(anchor: Anchor): void { if (q.select(anchor)) q.compose() }
@@ -33,9 +33,8 @@ function endsAt(anchor: Anchor | undefined, line: DiffLine): boolean {
 </script>
 
 <template>
-  <DiffHunkView :hunk="hunk" :file-id="fileId" :old-path="oldPath" :new-path="newPath" selectable :anchor="retained ?? selected" :locked="!!q.draft.value" @select="q.select" @ask="ask" @selection-error="q.error.value = $event">
+  <DiffHunkView :hunk="hunk" :file-id="fileId" :old-path="oldPath" :new-path="newPath" selectable :anchor="retained ?? selected" :locked="!!q.draft.value" @ask="ask" @selection-error="q.error.value = $event">
     <template #after-row="{ line }">
-      <div v-if="!retained && endsAt(selected, line)" class="selection-actions"><AppButton variant="primary" @click="q.compose">Ask about selection</AppButton></div>
       <InitialQuestion v-if="endsAt(retained, line)" />
       <div v-for="thread in matchingThreads.filter((item): boolean => endsAt(item.context.anchor, line))" :key="thread.id" class="inline-thread"><ConversationView v-if="thread.inline" :thread="thread" inline /><AppButton v-else variant="quiet" @click="thread.inline = true">Open inline conversation · {{ thread.answers.length }} {{ thread.answers.length === 1 ? 'answer' : 'answers' }}</AppButton></div>
     </template>
@@ -43,7 +42,6 @@ function endsAt(anchor: Anchor | undefined, line: DiffLine): boolean {
 </template>
 
 <style scoped>
-.selection-actions { padding: 12px 16px; border-block: 1px solid var(--border); background: var(--canvas); }
 .inline-thread { border-block: 1px solid var(--border); font: 12px var(--sans); }
 .inline-thread > .button { margin: 8px 16px; }
 </style>

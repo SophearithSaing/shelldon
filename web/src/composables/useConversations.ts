@@ -152,7 +152,7 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
     if (draft.value) { error.value = 'Resume or discard the retained question before selecting another range.'; return false }
     if (sourcePending.value || !source.value) return false
     const context = selectionContext(source.value, anchor)
-    if (!context) { error.value = 'Select changed text on one side within one hunk, or select the whole hunk.'; return false }
+    if (!context) { error.value = 'Select changed text using line numbers on one side within one hunk.'; return false }
     selection.value = context
     return true
   }

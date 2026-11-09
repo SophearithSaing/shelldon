@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { EvidenceAnchor } from '../../api/contracts/generation'
 import type { Anchor, SourceReference } from '../../api/contracts/questions'
 import type { DiffHunk as Hunk, SourceDiff } from '../../api/contracts/source'
-import { selectionContext } from '../../api/selection'
 import { useConversationContext } from '../../composables/useConversations'
 import ChangedFileHeader from '../source/ChangedFileHeader.vue'
 import DiffHunk from '../source/DiffHunk.vue'
@@ -13,7 +12,6 @@ import StatusMessage from '../ui/StatusMessage.vue'
 const props = defineProps<{ diff: SourceDiff; range: EvidenceAnchor; understood: boolean; matching: boolean }>()
 defineEmits<{ understood: [fileID: string] }>()
 const q = useConversationContext()
-const chosen = ref<Anchor | undefined>(undefined)
 const file = computed((): SourceDiff['files'][number] | undefined => props.diff.files.find((item): boolean => item.id === props.range.fileID))
 const reference = computed((): SourceReference => ({ revisionID: props.diff.revisionID, anchor: { kind: 'lines', ...props.range }, oldPath: file.value?.oldPath, newPath: file.value?.newPath }))
 const contextLines = computed((): Hunk['lines'] | undefined => file.value?.hunks?.find((item): boolean => item.id === props.range.hunkID)?.lines)
@@ -27,24 +25,14 @@ const excerpt = computed((): Hunk | null => {
 })
 
 /**
- * Keeps excerpt selection local until the user explicitly asks from it.
- * @param anchor Selected excerpt range.
- */
-function select(anchor: Anchor): void { if (selectionContext(props.diff, anchor)) chosen.value = anchor }
-
-/** Opens the existing single-range composer in Files changed without dispatching a question. */
-function ask(): void { if (chosen.value) q.navigate({ ...reference.value, anchor: chosen.value }, true) }
-
-/**
- * Opens the original-source composer directly from a clicked or dragged excerpt range.
+ * Opens the original-source composer directly from line-number activation or a gutter drag.
  * @param anchor Supported single-side selection.
  */
 function askRange(anchor: Anchor): void { q.navigate({ ...reference.value, anchor }, true) }
 </script>
 
-<template><article class="excerpt" :aria-label="`Semantic excerpt ${file?.newPath ?? file?.oldPath ?? 'unavailable'}`"><template v-if="file && excerpt"><ChangedFileHeader :file="file" :understood="understood" :disabled="!matching" @understood="$emit('understood', $event)"><AppButton variant="quiet" :disabled="!matching || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></ChangedFileHeader><DiffHunk :hunk="excerpt" :context-lines="contextLines" :old-path="file.oldPath" :new-path="file.newPath" :file-id="file.id" :selectable="matching" :hunk-selectable="false" :locked="!!q.draft.value" :anchor="chosen" @select="select" @ask="askRange" @selection-error="q.error.value = $event" /><div v-if="chosen" class="ask"><AppButton variant="primary" :disabled="!matching || !!q.draft.value" @click="ask">Ask about selected range</AppButton></div></template><StatusMessage v-else tone="error">This saved excerpt does not resolve to its original source inventory.</StatusMessage></article></template>
+<template><article class="excerpt" :aria-label="`Semantic excerpt ${file?.newPath ?? file?.oldPath ?? 'unavailable'}`"><template v-if="file && excerpt"><ChangedFileHeader :file="file" :understood="understood" :disabled="!matching" @understood="$emit('understood', $event)"><AppButton variant="quiet" :disabled="!matching || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></ChangedFileHeader><DiffHunk :hunk="excerpt" :context-lines="contextLines" :old-path="file.oldPath" :new-path="file.newPath" :file-id="file.id" :selectable="matching" :locked="!!q.draft.value" @ask="askRange" @selection-error="q.error.value = $event" /></template><StatusMessage v-else tone="error">This saved excerpt does not resolve to its original source inventory.</StatusMessage></article></template>
 
 <style scoped>
 .excerpt { background: var(--paper); margin-bottom: 16px; }
-.ask { padding: 12px 16px; border-top: 1px solid var(--border); }
 </style>

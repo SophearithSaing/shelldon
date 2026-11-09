@@ -31,8 +31,7 @@ export async function load(page: Page, count = 3): Promise<void> {
  */
 export async function compose(page: Page, line = 15): Promise<Locator> {
   const file = page.getByRole('article', { name: 'Changed file src/auth/refresh.ts', exact: true })
-  await file.getByRole('button', { name: `Select head line ${line}`, exact: true }).click()
-  await file.getByRole('button', { name: 'Ask about selection', exact: true }).click()
+  await file.getByRole('button', { name: `Ask about head line ${line}`, exact: true }).click()
   return page.getByRole('region', { name: 'Initial source question', exact: true })
 }
 

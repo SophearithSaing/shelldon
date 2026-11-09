@@ -45,7 +45,7 @@ test('cancel retains one pinned initial draft across files/features and source r
   await initial.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Refresh source', exact: true })).toBeDisabled()
   await page.getByRole('navigation', { name: 'Changed files', exact: true }).getByRole('button', { name: 'src/auth/store.ts M', exact: true }).click()
-  await expect(page.getByRole('article', { name: 'Changed file src/auth/store.ts', exact: true }).getByRole('button', { name: 'Select head line 9', exact: true })).toBeDisabled()
+  await expect(page.getByRole('article', { name: 'Changed file src/auth/store.ts', exact: true }).getByRole('button', { name: 'Ask about head line 9', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: 'Questions', exact: true }).click()
   await page.getByRole('button', { name: 'Resume question', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Initial source question', exact: true }).getByRole('textbox')).toHaveValue('Keep this exact original range.')

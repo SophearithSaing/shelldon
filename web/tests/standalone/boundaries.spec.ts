@@ -61,10 +61,10 @@ test('empty and non-text comparisons remain complete and have no line questions'
   await page.getByRole('button', { name: 'Refresh source', exact: true }).click()
   const image = page.getByRole('article', { name: 'Changed file assets/diagram.png', exact: true })
   await expect(image).toContainText('Binary file added.')
-  await expect(image.getByRole('button', { name: /Select / })).toHaveCount(0)
+  await expect(image.getByRole('button', { name: /Ask about .* line/ })).toHaveCount(0)
 })
 
-test('old-side Shift ranges stay in one hunk and native text selection starts no work', async ({ page }): Promise<void> => {
+test('old-side gutter drags preserve coordinates and native text selection starts no work', async ({ page }): Promise<void> => {
   await open(page, 1604)
   await load(page)
   let admissions = 0
@@ -80,9 +80,13 @@ test('old-side Shift ranges stay in one hunk and native text selection starts no
   })
   expect(literal).toContain('sessionStore')
   expect(admissions).toBe(0)
-  await file.getByRole('button', { name: 'Select old line 16', exact: true }).click()
-  await file.getByRole('button', { name: 'Select old line 18', exact: true }).click({ modifiers: ['Shift'] })
-  await file.getByRole('button', { name: 'Ask about selection', exact: true }).click()
+  const start = await file.getByRole('button', { name: 'Ask about old line 16', exact: true }).boundingBox()
+  const end = await file.getByRole('button', { name: 'Ask about old line 18', exact: true }).boundingBox()
+  if (!start || !end) throw new Error('Expected visible gutter numbers.')
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 8 })
+  await page.mouse.up()
   await expect(page.getByRole('region', { name: 'Initial source question', exact: true })).toContainText('Old L16–18')
   expect(admissions).toBe(0)
 })
