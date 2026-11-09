@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:web": "vite --mode standalone",
+    "test:standalone": "playwright test --config playwright.standalone.config.ts",
     "test": "playwright test",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "typecheck:standalone": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.standalone.json",
     "build": "npm run typecheck && vite build"
   },
   "dependencies": {

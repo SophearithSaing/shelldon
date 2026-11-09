@@ -10,12 +10,15 @@ import { backendProxy, loopbackOrigin, protectedDevelopmentServer } from './deve
  * @param options Vite command context.
  * @returns Vite configuration.
  */
-export default defineConfig(({ command }): UserConfig => {
-  if (command !== 'serve') return { plugins: [vue()] }
+export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
+  if (command !== 'serve') return { plugins: [vue()], define: { __STANDALONE__: 'false' } }
   const frontend = loopbackOrigin(process.env.SHELDON_DEV_ORIGIN ?? 'http://127.0.0.1:5173')
   const backend = process.env.SHELDON_BACKEND_URL ?? 'http://127.0.0.1:7331'
+  const standalone = mode === 'standalone'
+  const api = standalone ? (await import('./development/api.ts')).developmentAPI() : undefined
   return {
-    plugins: [protectedDevelopmentServer(), vue()],
+    plugins: [protectedDevelopmentServer(), ...(api ? [api] : []), vue()],
+    define: { __STANDALONE__: JSON.stringify(standalone) },
     server: {
       host: frontend.hostname.replace(/^\[|\]$/g, ''),
       port: Number(frontend.port),
@@ -28,7 +31,7 @@ export default defineConfig(({ command }): UserConfig => {
           dirname(dirname(fileURLToPath(import.meta.resolve('vue/package.json')))),
         ],
       },
-      proxy: {
+      proxy: standalone ? undefined : {
         '^/api(?:/|$)': backendProxy(backend),
         '^/instance-proof(?:\\?|$)': backendProxy(backend),
       },
