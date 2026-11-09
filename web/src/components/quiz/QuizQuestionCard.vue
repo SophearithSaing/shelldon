@@ -10,7 +10,7 @@ const id = useId()
 </script>
 
 <template>
-  <article class="question-card" :aria-label="`Quiz question ${index + 1}`"><span class="eyebrow">QUESTION {{ index + 1 }} OF {{ total }}</span><h3>{{ question.prompt }}</h3><fieldset :disabled="!!checked || checking"><legend>Choose one answer</legend><label v-for="option in question.choices" :key="option.choiceID" :class="{ selected: choice === option.choiceID, correct: checked?.correctChoiceID === option.choiceID, incorrect: checked && choice === option.choiceID && !checked.correct }"><input type="radio" :name="id" :value="option.choiceID" :checked="choice === option.choiceID" @change="$emit('choice', option.choiceID)" /><span>{{ option.text }}</span><strong v-if="checked?.correctChoiceID === option.choiceID">Correct answer</strong><strong v-else-if="checked && choice === option.choiceID && !checked.correct">Your answer</strong></label></fieldset><footer v-if="!checked"><span>Choose an alternative, then check your answer.</span><AppButton variant="primary" :disabled="!choice || checking" @click="$emit('check')">{{ checking ? 'Checking…' : 'Check answer' }}</AppButton></footer><section v-else class="explanation" aria-label="Checked explanation"><h4>{{ checked.correct ? 'That’s right.' : 'Not quite.' }}</h4><p>{{ checked.explanation }}</p><EvidenceQuote v-for="(evidence, number) in checked.evidence" :key="number" :evidence="evidence" :revision-id="checked.revisionID" /></section></article>
+  <article class="question-card" :aria-label="`Quiz question ${index + 1}`"><span class="eyebrow">QUESTION {{ index + 1 }} OF {{ total }}</span><h3>{{ question.prompt }}</h3><fieldset :disabled="!!checked || checking"><legend>Choose one answer</legend><label v-for="option in question.choices" :key="option.choiceID" :class="{ selected: choice === option.choiceID, correct: checked?.correctChoiceID === option.choiceID, incorrect: checked && choice === option.choiceID && !checked.correct }"><input type="radio" :name="id" :value="option.choiceID" :checked="choice === option.choiceID" @change="$emit('choice', option.choiceID)" /><span>{{ option.text }}</span><strong v-if="checked?.correctChoiceID === option.choiceID">Correct answer</strong><strong v-else-if="checked && choice === option.choiceID && !checked.correct">Your answer</strong></label></fieldset><footer v-if="!checked"><AppButton variant="primary" :disabled="!choice || checking" @click="$emit('check')">{{ checking ? 'Checking…' : 'Check answer' }}</AppButton></footer><section v-else class="explanation" aria-label="Checked explanation"><h4>{{ checked.correct ? 'That’s right.' : 'Not quite.' }}</h4><p>{{ checked.explanation }}</p><EvidenceQuote v-for="(evidence, number) in checked.evidence" :key="number" :evidence="evidence" :revision-id="checked.revisionID" /></section></article>
 </template>
 
 <style scoped>
@@ -28,8 +28,7 @@ label strong { font-size: 10px; }
 .selected { border-color: var(--accent); background: var(--accent-soft); }
 .correct { border-color: var(--added); background: var(--added-bg); }
 .incorrect { border-color: var(--removed); background: var(--removed-bg); }
-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
-footer span { color: var(--muted); font-size: 10px; }
+footer { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
 .explanation { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px; }
 h4 { margin: 0; font-size: 15px; }
 .explanation p { line-height: 1.8; }

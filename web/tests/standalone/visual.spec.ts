@@ -36,6 +36,7 @@ test('quiz start/loading/checked/results and replacement confirmation render in 
   await expect(page.locator('.generation-panel:visible .generation-status')).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('quiz-loading-dark.png') })
   await expect(page.getByRole('article', { name: 'Quiz question 1', exact: true })).toBeVisible()
+  await expect(page.getByText('Choose an alternative, then check your answer.', { exact: true })).toHaveCount(0)
   await expect(page.locator('.generation-panel:visible .generation-status')).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('quiz-ready-dark.png') })
   await page.getByRole('radio', { name: 'Each always starts a separate network request.', exact: true }).check()
