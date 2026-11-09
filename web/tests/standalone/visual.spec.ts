@@ -1,6 +1,30 @@
 import { expect, test } from '@playwright/test'
 import { load, open } from './helpers'
 
+for (const feature of ['quiz', 'semantic'] as const) test(`${feature} start content sits above center and stays reachable on short screens`, async ({ page }, info): Promise<void> => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await open(page, feature === 'quiz' ? 1803 : 1804)
+  await load(page)
+  await page.getByRole('button', { name: feature === 'quiz' ? 'Quiz' : 'Semantic review', exact: true }).click()
+  const button = page.getByRole('button', { name: feature === 'quiz' ? 'Generate quiz' : 'Generate semantic review', exact: true })
+  await expect(button).toBeEnabled()
+  const heading = page.locator('.generation-panel:visible .start h2')
+  const panel = await page.locator('.generation-panel:visible').boundingBox()
+  const title = await heading.boundingBox()
+  const action = await button.boundingBox()
+  expect(panel).not.toBeNull()
+  expect(title).not.toBeNull()
+  expect(action).not.toBeNull()
+  expect((title!.y + action!.y + action!.height) / 2).toBeLessThan(panel!.y + panel!.height / 2 - 40)
+  await page.screenshot({ path: info.outputPath(`${feature}-start-offset-desktop.png`) })
+  await page.setViewportSize({ width: 700, height: 600 })
+  await button.scrollIntoViewIfNeeded()
+  await expect(button).toBeInViewport()
+  await page.screenshot({ path: info.outputPath(`${feature}-start-offset-short.png`) })
+  await heading.scrollIntoViewIfNeeded()
+  await expect(heading).toBeInViewport()
+})
+
 test('quiz start/loading/checked/results and replacement confirmation render in both themes', async ({ page }, info): Promise<void> => {
   await open(page, 1801)
   await load(page)

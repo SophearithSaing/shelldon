@@ -41,7 +41,7 @@ header h2 { margin: 0 auto 0 0; font-size: 22px; font-weight: 600; }
 header > div { display: flex; gap: 8px; flex-wrap: wrap; }
 .ready > header { padding: 6px 16px; min-height: 40px; }
 .ready > header h2 { font-size: 16px; }
-.start { text-align: center; max-width: 540px; margin: auto; padding: 48px 24px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.start { text-align: center; max-width: 540px; margin: auto; padding: 24px 24px clamp(48px, 20dvh, 200px); display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .start h2 { font-size: 28px; font-weight: 600; margin: 0; letter-spacing: -.6px; }
 .start p { color: var(--muted); margin: 0; }
 .start img { width: 144px; height: 144px; object-fit: contain; margin: 12px 0; }
