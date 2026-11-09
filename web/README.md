@@ -28,6 +28,8 @@ For the real Go backend, use `npm run dev` and the CLI as documented in the root
 
 Source, initial drafts, follow-up drafts, reading position, understanding and quiz practice are page-memory state. Theme/rail/feature changes retain them. A new displayed source revision resets only file understanding; older conversations/results keep their original identities and quotes. Browser reload/disconnect clears page state, not accepted backend work. Development server restart also resets its in-memory records; real private saving remains Go-owned in OS storage.
 
+The conversation dropdown remains a native select. Its menu is customized with CSS `appearance: base-select` / `::picker(select)` where supported, including theme colors, selected/hover states, wrapping labels and bounded scrolling. Opening, keyboard navigation, selection, dismissal and focus stay browser-owned; no custom dropdown JavaScript is added. Other browsers retain the styled native control, and forced-colors mode restores native presentation.
+
 ## Syntax highlighting
 
 Shiki 4.6.0 colors literal source with **GitHub Light** and **Ayu Dark**, following the app's theme switch. `SyntaxText.vue` renders escaped Vue text spans with external CSS classes, never HTML injection or inline token styles. Diff/selection backgrounds and line identities remain unchanged. The JavaScript regex engine needs neither WASM nor an eval exception in the release CSP. Themes, engine and path-selected grammars load from local bundled chunks; no CDN or backend calls are involved.
