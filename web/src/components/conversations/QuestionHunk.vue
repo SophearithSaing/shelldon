@@ -16,6 +16,12 @@ const retained = computed((): Anchor | undefined => q.draft.value?.context.revis
 const matchingThreads = computed((): ConversationThread[] => q.threads.value.filter((thread): boolean => thread.context.revisionID === props.revisionId && thread.context.anchor.hunkID === props.hunk.id))
 
 /**
+ * Opens the retained source composer directly after a supported line click or completed drag.
+ * @param anchor Exact gesture range.
+ */
+function ask(anchor: Anchor): void { if (q.select(anchor)) q.compose() }
+
+/**
  * Places a composer/marker directly after its original selection endpoint.
  * @param anchor Original selection.
  * @param line Current literal row.
@@ -27,7 +33,7 @@ function endsAt(anchor: Anchor | undefined, line: DiffLine): boolean {
 </script>
 
 <template>
-  <DiffHunkView :hunk="hunk" :file-id="fileId" :old-path="oldPath" :new-path="newPath" selectable :anchor="retained ?? selected" :locked="!!q.draft.value" @select="q.select">
+  <DiffHunkView :hunk="hunk" :file-id="fileId" :old-path="oldPath" :new-path="newPath" selectable :anchor="retained ?? selected" :locked="!!q.draft.value" @select="q.select" @ask="ask" @selection-error="q.error.value = $event">
     <template #after-row="{ line }">
       <div v-if="!retained && endsAt(selected, line)" class="selection-actions"><AppButton variant="primary" @click="q.compose">Ask about selection</AppButton></div>
       <InitialQuestion v-if="endsAt(retained, line)" />

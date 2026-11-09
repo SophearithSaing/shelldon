@@ -34,9 +34,15 @@ function select(anchor: Anchor): void { if (selectionContext(props.diff, anchor)
 
 /** Opens the existing single-range composer in Files changed without dispatching a question. */
 function ask(): void { if (chosen.value) q.navigate({ ...reference.value, anchor: chosen.value }, true) }
+
+/**
+ * Opens the original-source composer directly from a clicked or dragged excerpt range.
+ * @param anchor Supported single-side selection.
+ */
+function askRange(anchor: Anchor): void { q.navigate({ ...reference.value, anchor }, true) }
 </script>
 
-<template><article class="excerpt" :aria-label="`Semantic excerpt ${file?.newPath ?? file?.oldPath ?? 'unavailable'}`"><template v-if="file && excerpt"><ChangedFileHeader :file="file" :understood="understood" :disabled="!matching" @understood="$emit('understood', $event)"><AppButton variant="quiet" :disabled="!matching || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></ChangedFileHeader><DiffHunk :hunk="excerpt" :context-lines="contextLines" :old-path="file.oldPath" :new-path="file.newPath" :file-id="file.id" :selectable="matching" :hunk-selectable="false" :locked="!!q.draft.value" :anchor="chosen" @select="select" /><div v-if="chosen" class="ask"><AppButton variant="primary" :disabled="!matching || !!q.draft.value" @click="ask">Ask about selected range</AppButton></div></template><StatusMessage v-else tone="error">This saved excerpt does not resolve to its original source inventory.</StatusMessage></article></template>
+<template><article class="excerpt" :aria-label="`Semantic excerpt ${file?.newPath ?? file?.oldPath ?? 'unavailable'}`"><template v-if="file && excerpt"><ChangedFileHeader :file="file" :understood="understood" :disabled="!matching" @understood="$emit('understood', $event)"><AppButton variant="quiet" :disabled="!matching || !!q.draft.value" @click="q.navigate(reference)">View in original diff</AppButton></ChangedFileHeader><DiffHunk :hunk="excerpt" :context-lines="contextLines" :old-path="file.oldPath" :new-path="file.newPath" :file-id="file.id" :selectable="matching" :hunk-selectable="false" :locked="!!q.draft.value" :anchor="chosen" @select="select" @ask="askRange" @selection-error="q.error.value = $event" /><div v-if="chosen" class="ask"><AppButton variant="primary" :disabled="!matching || !!q.draft.value" @click="ask">Ask about selected range</AppButton></div></template><StatusMessage v-else tone="error">This saved excerpt does not resolve to its original source inventory.</StatusMessage></article></template>
 
 <style scoped>
 .excerpt { background: var(--paper); margin-bottom: 16px; }

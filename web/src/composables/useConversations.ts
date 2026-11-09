@@ -48,7 +48,7 @@ export interface Conversations {
   error: Ref<string>
   sourceRequest: ShallowRef<SourceNavigation | null>
   hasPageState: ComputedRef<boolean>
-  select: (anchor: Anchor) => void
+  select: (anchor: Anchor) => boolean
   compose: () => void
   resume: () => void
   discard: () => void
@@ -145,14 +145,16 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
   /**
    * Selects source without replacing a retained initial draft.
    * @param anchor Exact displayed selection.
+   * @returns Whether this selection was accepted without replacing another draft.
    */
-  function select(anchor: Anchor): void {
+  function select(anchor: Anchor): boolean {
     error.value = ''
-    if (draft.value) { error.value = 'Resume or discard the retained question before selecting another range.'; return }
-    if (sourcePending.value || !source.value) return
+    if (draft.value) { error.value = 'Resume or discard the retained question before selecting another range.'; return false }
+    if (sourcePending.value || !source.value) return false
     const context = selectionContext(source.value, anchor)
-    if (!context) { error.value = 'Select changed text on one side within one hunk, or select the whole hunk.'; return }
+    if (!context) { error.value = 'Select changed text on one side within one hunk, or select the whole hunk.'; return false }
     selection.value = context
+    return true
   }
 
   /** Opens the single initial composer without starting backend work. */
