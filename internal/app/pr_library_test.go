@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -169,5 +170,91 @@ func TestPRLibraryConcurrentRegistration(t *testing.T) {
 	got, err := i.ListPRs(libraryQuery())
 	if err != nil || got.Total != 12 {
 		t.Fatalf("lost membership: %+v %v", got, err)
+	}
+}
+
+func TestPRLibraryLegacyFallbackAndUnsafeStorage(t *testing.T) {
+	for _, kind := range []string{"legacy", "linked-parent", "public-file", "blocked-parent"} {
+		t.Run(kind, func(t *testing.T) {
+			paths := testPaths(t)
+			i := ownedPRInstance(t, paths.Data)
+			pr, _ := i.RegisterPR("https://github.com/owner/repo/pull/1")
+			title, author := "Legacy title", "legacy-author"
+			pr.Title, pr.Author = &title, &author
+			if err := i.savePRIndex(prIndex{SchemaVersion: 1, PRs: []githubpr.PullRequest{pr}}); err != nil {
+				t.Fatal(err)
+			}
+			expectedStatus := "missing"
+			switch kind {
+			case "linked-parent":
+				if err := os.Symlink(t.TempDir(), filepath.Join(paths.Data, "reviews")); err != nil {
+					t.Skipf("symlinks unavailable: %v", err)
+				}
+				expectedStatus = "unavailable"
+			case "blocked-parent":
+				if err := os.WriteFile(filepath.Join(paths.Data, "reviews"), []byte("preserve"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				expectedStatus = "unavailable"
+			case "public-file":
+				if runtime.GOOS == "windows" {
+					t.Skip("POSIX permission check")
+				}
+				if _, err := i.savePRMetadata(libraryMetadata(pr.ID)); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chmod(filepath.Join(paths.Data, "reviews", pr.ID, "pr-metadata.json"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				expectedStatus = "unavailable"
+			}
+			result, err := i.ListPRs(libraryQuery())
+			if err != nil || result.Total != 1 || result.Items[0].MetadataStatus != expectedStatus || result.Items[0].State != "unknown" || *result.Items[0].PR.Title != title || *result.Items[0].PR.Author != author {
+				t.Fatalf("fallback: %+v %v", result, err)
+			}
+			if kind != "legacy" {
+				if _, err := i.savePRMetadata(libraryMetadata(pr.ID)); err == nil {
+					t.Fatal("refresh replaced unsafe storage")
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkPRLibrary1000(b *testing.B) {
+	dir := filepath.Join(b.TempDir(), "private")
+	if err := os.Mkdir(dir, 0700); err != nil {
+		b.Fatal(err)
+	}
+	i, err := openInstance(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer i.close()
+	if owned, err := i.acquire(); err != nil || !owned {
+		b.Fatal("writer unavailable")
+	}
+	index := prIndex{SchemaVersion: 1, PRs: []githubpr.PullRequest{}}
+	for n := 1; n <= 1000; n++ {
+		pr, _ := githubpr.ParseURL(fmt.Sprintf("https://github.com/owner/repo/pull/%d", n))
+		index.PRs = append(index.PRs, pr)
+		dir := filepath.Join(filepath.Dir(i.file.Name()), "reviews", pr.ID)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			b.Fatal(err)
+		}
+		data, _ := json.Marshal(libraryMetadata(pr.ID))
+		if err := os.WriteFile(filepath.Join(dir, "pr-metadata.json"), data, 0600); err != nil {
+			b.Fatal(err)
+		}
+	}
+	if err := i.savePRIndex(index); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for b.Loop() {
+		result, err := i.ListPRs(libraryQuery())
+		if err != nil || result.Total != 1000 {
+			b.Fatalf("list: %d %v", result.Total, err)
+		}
 	}
 }

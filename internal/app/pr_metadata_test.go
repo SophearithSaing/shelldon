@@ -51,11 +51,6 @@ func TestRefreshPRMetadataOffline(t *testing.T) {
 	}
 	file := filepath.Join(paths.Data, "reviews", pr.ID, "pr-metadata.json")
 	before, _ := os.ReadFile(file)
-	i.metadataRefreshing[pr.ID] = true
-	if _, err := i.RefreshPRMetadata(context.Background(), pr); !errors.Is(err, githubpr.ErrMetadataBusy) {
-		t.Fatalf("busy: %v", err)
-	}
-	delete(i.metadataRefreshing, pr.ID)
 	t.Setenv("SHELDON_TEST_GH_MODE", "auth")
 	if _, err := i.RefreshPRMetadata(context.Background(), pr); err == nil {
 		t.Fatal("auth failure became refresh success")
@@ -72,6 +67,52 @@ func TestRefreshPRMetadataOffline(t *testing.T) {
 	}
 	if len(i.metadataRefreshing) != 0 {
 		t.Fatal("cancelled command retained slot")
+	}
+	audit := os.Getenv("SHELDON_TEST_GH_AUDIT")
+	if err := os.Remove(audit); err != nil {
+		t.Fatal(err)
+	}
+	active, stop := context.WithCancel(context.Background())
+	defer stop()
+	done := make(chan error, 1)
+	go func() {
+		_, err := i.RefreshPRMetadata(active, pr)
+		done <- err
+	}()
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	tick := time.NewTicker(5 * time.Millisecond)
+	defer tick.Stop()
+waiting:
+	for {
+		select {
+		case <-deadline.C:
+			stop()
+			<-done
+			t.Fatal("fixture did not start")
+		case err := <-done:
+			t.Fatalf("refresh ended before cancellation: %v", err)
+		case <-tick.C:
+			if _, err := os.Stat(audit); err == nil {
+				break waiting
+			}
+		}
+	}
+	if _, err := i.RefreshPRMetadata(context.Background(), pr); !errors.Is(err, githubpr.ErrMetadataBusy) {
+		t.Errorf("concurrent refresh: %v", err)
+	}
+	if _, err := i.ListPRs(libraryQuery()); err != nil {
+		t.Errorf("active refresh blocked cached read: %v", err)
+	}
+	if _, err := i.RegisterPR("https://github.com/owner/repo/pull/33"); err != nil {
+		t.Errorf("active refresh blocked registration: %v", err)
+	}
+	stop()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("active cancellation: %v", err)
+	}
+	if len(i.metadataRefreshing) != 0 {
+		t.Fatal("active cancellation retained slot")
 	}
 	unregistered, _ := githubpr.ParseURL("https://github.com/owner/repo/pull/32")
 	if _, err := i.RefreshPRMetadata(context.Background(), unregistered); !errors.Is(err, os.ErrNotExist) {
