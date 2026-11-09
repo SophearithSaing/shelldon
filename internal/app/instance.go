@@ -31,6 +31,7 @@ type instance struct {
 	questionStoreMu        sync.Mutex
 	questionStoreUncertain map[string]bool
 	questionsLoaded        map[string]bool
+	metadataRefreshing     map[string]bool
 	closing                bool
 	closeOnce              sync.Once
 	closeErr               error

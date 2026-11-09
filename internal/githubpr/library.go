@@ -11,6 +11,8 @@ import (
 
 const MaxMetadataBytes = 16 << 10
 
+var ErrMetadataBusy = errors.New("PR metadata refresh is already active")
+
 // Metadata is a saved display observation, independent of pinned source.
 type Metadata struct {
 	SchemaVersion int        `json:"schemaVersion"`

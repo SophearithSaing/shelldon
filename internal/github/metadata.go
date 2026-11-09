@@ -39,24 +39,37 @@ func (e *MetadataError) Unwrap() error { return e.cause }
 
 // metadata requests one PR through a bounded, noninteractive native gh command.
 func metadata(ctx context.Context, pr githubpr.PullRequest) (Resolution, error) {
+	body, err := metadataBody(ctx, pr)
+	if err != nil {
+		return Resolution{}, err
+	}
+	resolved, err := parseMetadata(body, pr)
+	if err != nil {
+		return Resolution{}, &MetadataError{Code: "invalid-metadata", HTTPStatus: 200}
+	}
+	return resolved, nil
+}
+
+// metadataBody reads bounded GitHub JSON without interpreting source or display fields.
+func metadataBody(ctx context.Context, pr githubpr.PullRequest) ([]byte, error) {
 	executable, err := exec.LookPath("gh")
 	if err != nil {
 		code := "cli-unavailable"
 		if errors.Is(err, exec.ErrNotFound) {
 			code = "cli-missing"
 		}
-		return Resolution{}, &MetadataError{Code: code, ExitCode: -1}
+		return nil, &MetadataError{Code: code, ExitCode: -1}
 	}
 	ext := strings.ToLower(filepath.Ext(executable))
 	if !filepath.IsAbs(executable) || ext == ".cmd" || ext == ".bat" || ext == ".ps1" || runtime.GOOS != "windows" && ext == ".exe" {
-		return Resolution{}, &MetadataError{Code: "unsupported-executable", ExitCode: -1}
+		return nil, &MetadataError{Code: "unsupported-executable", ExitCode: -1}
 	}
 	if !filepath.IsAbs(os.TempDir()) {
-		return Resolution{}, &MetadataError{Code: "temporary-storage", ExitCode: -1}
+		return nil, &MetadataError{Code: "temporary-storage", ExitCode: -1}
 	}
 	dir, err := os.MkdirTemp("", "sheldon-gh-")
 	if err != nil {
-		return Resolution{}, &MetadataError{Code: "temporary-storage", ExitCode: -1}
+		return nil, &MetadataError{Code: "temporary-storage", ExitCode: -1}
 	}
 	defer os.RemoveAll(dir)
 	request, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -69,7 +82,7 @@ func metadata(ctx context.Context, pr githubpr.PullRequest) (Resolution, error) 
 	})
 	status, body, parseErr := responseBody(result.Stdout)
 	if ctx.Err() != nil {
-		return Resolution{}, ctx.Err()
+		return nil, ctx.Err()
 	}
 	failure := &MetadataError{ExitCode: result.ExitCode, HTTPStatus: status}
 	switch {
@@ -90,13 +103,9 @@ func metadata(ctx context.Context, pr githubpr.PullRequest) (Resolution, error) 
 	case parseErr != nil || status != 200:
 		failure.Code = "invalid-response"
 	default:
-		resolved, err := parseMetadata(body, pr)
-		if err == nil {
-			return resolved, nil
-		}
-		failure.Code = "invalid-metadata"
+		return body, nil
 	}
-	return Resolution{}, failure
+	return nil, failure
 }
 
 // responseBody separates native --include headers from the already decoded body.
