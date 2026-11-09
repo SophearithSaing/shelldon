@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import type { SourceDiff } from '../../api/contracts/source'
 import FileDiff from './FileDiff.vue'
 import LazyFile from './LazyFile.vue'
 import type { Anchor } from '../../api/contracts/questions'
+import { useReadingPosition } from '../../composables/useReadingPosition'
 
-const props = defineProps<{ source: SourceDiff; understood: Set<string> }>()
+const props = defineProps<{ source: SourceDiff; understood: Set<string>; visible: boolean }>()
 const emit = defineEmits<{ active: [id: string]; understood: [id: string] }>()
 const viewport = ref<HTMLElement | null>(null)
+useReadingPosition(viewport, toRef(props, 'visible'))
 const requested = ref('')
 let frame = 0
 

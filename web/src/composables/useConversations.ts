@@ -2,7 +2,7 @@ import { computed, inject, onBeforeUnmount, ref, shallowRef } from 'vue'
 import type { ComputedRef, InjectionKey, Ref, ShallowRef } from 'vue'
 import { APIError, errorMessage } from '../api/client'
 import { answerAction, askFollowup, askQuestion, observeAnswer, readThread, readThreads } from '../api/questions'
-import { selectionContext } from '../api/selection'
+import { sameAnchor, selectionContext } from '../api/selection'
 import type { Answer, Anchor, QuestionContext, SourceReference, ThreadDetail, ThreadList } from '../api/contracts/questions'
 import type { SourceDiff } from '../api/contracts/source'
 import { setPageGuard } from './navigation'
@@ -139,7 +139,7 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
    * @returns Whether continuation is currently unavailable.
    */
   function unavailable(thread: ConversationThread): boolean {
-    return !thread.answers.length || thread.uncertain || thread.sending || busy(thread.context.revisionID) || thread.session.state === 'unknown' || thread.session.state === 'unavailable'
+    return !thread.answers.length || thread.uncertain || thread.sending || busy(thread.context.revisionID) || ['busy', 'unknown', 'unavailable'].includes(thread.session.state)
   }
 
   /**
@@ -203,6 +203,7 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
     const index = thread.answers.findIndex((item): boolean => item.answerID === answer.answerID)
     const previous = thread.answers[index]
     if (previous && (terminal(previous) && !terminal(answer) || previous.text.length > answer.text.length || previous.savedVersion && answer.savedVersion && BigInt(previous.savedVersion) > BigInt(answer.savedVersion))) return
+    if (previous?.stopRequested) answer = { ...answer, stopRequested: true }
     if (index < 0) thread.answers.push(answer)
     else thread.answers[index] = answer
     if (terminal(answer)) thread.session = answer.executionUnknown ? { state: 'unknown', reason: 'execution-uncertain' } : answer.persistence === 'failed' ? { state: 'unavailable', reason: 'answer-not-saved' } : { state: 'unverified', reason: 'continuation-requires-verification' }
@@ -235,7 +236,7 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
    * @param text Submitted question.
    */
   function validateAdmission(answer: Answer, context: QuestionContext, text: string): void {
-    if (!/^[a-f0-9]{64}$/.test(answer.answerID) || !/^[a-f0-9]{64}$/.test(answer.threadID) || answer.prID !== prID || answer.revisionID !== context.revisionID || answer.question !== text || answer.reference?.revisionID !== context.revisionID || !answer.reference.anchor || Object.keys(answer.reference.anchor).length !== Object.keys(context.anchor).length || !Object.entries(context.anchor).every(([key, value]): boolean => Reflect.get(answer.reference.anchor, key) === value)) throw new Error('Uncertain question admission.')
+    if (!/^[a-f0-9]{64}$/.test(answer.answerID) || !/^[a-f0-9]{64}$/.test(answer.threadID) || answer.prID !== prID || answer.revisionID !== context.revisionID || answer.question !== text || answer.reference?.revisionID !== context.revisionID || !sameAnchor(answer.reference.anchor, context.anchor)) throw new Error('Uncertain question admission.')
   }
 
   /** Sends the initial draft once after an explicit user action. */
@@ -298,6 +299,7 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
     thread.error = ''
     try {
       const result = await answerAction(answer, operation)
+      if (result.answerID !== answer.answerID || result.question !== answer.question || !sameAnchor(result.reference?.anchor, answer.reference.anchor)) throw new Error('Mismatched answer acknowledgement.')
       if (!lifetime.signal.aborted) merge(thread, result)
     } catch (cause) { if (!lifetime.signal.aborted) thread.error = errorMessage(cause) }
   }
@@ -328,14 +330,14 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
     try {
       const detail = await readThread(prID, threadID, lifetime.signal)
       if (lifetime.signal.aborted || request !== detailRequest || selected.value !== threadID) return
-      if (detail.prID !== prID || detail.threadID !== threadID || detail.context.revisionID !== detail.revisionID || !detail.answers.length) throw new Error('Invalid saved thread.')
+      if (detail.prID !== prID || detail.threadID !== threadID || !/^(0|[1-9][0-9]*)$/.test(detail.version) || detail.context.revisionID !== detail.revisionID || !Array.isArray(detail.answers) || !detail.answers.length || detail.answers.some((answer): boolean => answer.prID !== prID || answer.threadID !== threadID || answer.revisionID !== detail.revisionID || !sameAnchor(answer.reference?.anchor, detail.context.anchor))) throw new Error('Invalid saved thread.')
       let thread = threads.value.find((item): boolean => item.id === threadID)
       if (!thread) {
         threads.value.push({ id: threadID, context: detail.context, answers: [], draft: '', inline: false, sending: false, uncertain: false, error: '', observationLost: false, session: detail.session })
         thread = threads.value.at(-1)!
       }
       for (const answer of detail.answers) merge(thread, answer)
-      thread.session = detail.session
+      if (!thread.answers.at(-1)?.savedVersion || BigInt(detail.version) >= BigInt(thread.answers.at(-1)!.savedVersion!)) thread.session = detail.session
       selected.value = thread.id
       const latest = thread.answers.at(-1)!
       if (!terminal(latest) || detail.persistence !== 'saved') observe(thread)
@@ -356,7 +358,7 @@ export function useConversations(prID: string, source: ShallowRef<SourceDiff | n
    * @returns Whether navigation was accepted.
    */
   function navigate(reference: SourceReference, ask = false): boolean {
-    if (!matching(reference) || draft.value || sourcePending.value) { error.value = draft.value ? 'Resume or discard the retained question before changing its source selection.' : 'Load the matching original source before navigating to this range.'; return false }
+    if (!matching(reference) || draft.value || sourcePending.value) { error.value = draft.value ? 'Resume or discard the retained question before changing its source selection.' : sourcePending.value ? 'Wait for the current source request before navigating to another range.' : 'Load the matching original source before navigating to this range.'; return false }
     select(reference.anchor)
     if (ask) compose()
     sourceRequest.value = { ...reference, fileID: reference.anchor.fileID, focusDraft: ask }

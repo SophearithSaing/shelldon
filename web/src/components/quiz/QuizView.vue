@@ -12,9 +12,9 @@ import QuizResults from './QuizResults.vue'
 import AppButton from '../ui/AppButton.vue'
 import StatusMessage from '../ui/StatusMessage.vue'
 
-const props = defineProps<{ prId: string; source: SourceDiff | null; active: boolean }>()
+const props = defineProps<{ prId: string; source: SourceDiff | null; sourcePending: boolean; active: boolean }>()
 defineEmits<{ source: [] }>()
-const generation = useGeneration<QuizRead>(props.prId, 'quiz', toRef(props, 'source'), toRef(props, 'active'))
+const generation = useGeneration<QuizRead>(props.prId, 'quiz', toRef(props, 'source'), toRef(props, 'sourcePending'), toRef(props, 'active'))
 const quiz = computed((): Quiz | null => generation.result.value?.quiz ?? null)
 const count = computed((): number | undefined => quiz.value?.questions.length)
 const index = ref(0)

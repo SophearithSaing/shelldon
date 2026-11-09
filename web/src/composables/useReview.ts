@@ -9,6 +9,7 @@ interface ReviewState {
   source: ShallowRef<SourceDiff | null>
   decision: ShallowRef<Exclude<SourceResponse, { state: 'ready' }> | null>
   pending: Ref<boolean>
+  replacementBlocked: Ref<boolean>
   metadataPending: Ref<boolean>
   error: Ref<string>
   understood: Ref<Set<string>>
@@ -30,6 +31,7 @@ export function useReview(reviewID: Readonly<Ref<string>>): ReviewState {
   const source = shallowRef<SourceDiff | null>(null)
   const decision = shallowRef<Exclude<SourceResponse, { state: 'ready' }> | null>(null)
   const pending = ref(false)
+  const replacementBlocked = ref(false)
   const metadataPending = ref(false)
   const error = ref('')
   const understood = ref(new Set<string>())
@@ -69,6 +71,7 @@ export function useReview(reviewID: Readonly<Ref<string>>): ReviewState {
    */
   async function load(input: SourceRequest = { action: 'load' }): Promise<void> {
     if (pending.value || !pr.value) return
+    if (replacementBlocked.value) { error.value = 'Finish or discard the retained initial question before replacing its source.'; return }
     const requestEpoch = epoch
     const signal = controller!.signal
     pending.value = true
@@ -115,5 +118,5 @@ export function useReview(reviewID: Readonly<Ref<string>>): ReviewState {
   const progress = computed((): number => source.value?.files.length ? Math.round(understood.value.size / source.value.files.length * 100) : 0)
   watch(reviewID, read, { immediate: true })
   onBeforeUnmount((): void => { epoch++; controller?.abort() })
-  return { pr, source, decision, pending, metadataPending, error, understood, activeFile, progress, read, load, refresh, toggleUnderstood }
+  return { pr, source, decision, pending, replacementBlocked, metadataPending, error, understood, activeFile, progress, read, load, refresh, toggleUnderstood }
 }

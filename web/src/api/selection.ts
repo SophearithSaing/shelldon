@@ -2,6 +2,16 @@ import type { Anchor, QuestionContext, SourceReference } from './contracts/quest
 import type { SourceDiff } from './contracts/source.ts'
 
 /**
+ * Compares source coordinates without depending on JSON property order.
+ * @param left Original selection.
+ * @param right Received selection.
+ * @returns Whether both identify the exact same source range.
+ */
+export function sameAnchor(left: Anchor, right: Anchor): boolean {
+  return !!left && !!right && left.kind === right.kind && left.fileID === right.fileID && left.hunkID === right.hunkID && left.side === right.side && left.start === right.start && left.end === right.end
+}
+
+/**
  * Resolves a supported selection to original literal source without retargeting it.
  * @param source Complete displayed comparison.
  * @param anchor One hunk or one side's contiguous lines.

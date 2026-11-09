@@ -2,9 +2,9 @@
 
 **Don't just merge it. Understand it.**
 
-A local pull-request explainer. **Pinned Files changed + saved questions/follow-ups + separate fictional UI previews**—submitted questions and finished answers are saved locally with explicit save-failure feedback and PR-local reopening.
+A local pull-request explainer. Read pinned changes, ask at the source, practice with a quiz and explore related changes by intent.
 
-**Frontend rebuild:** the current Vue source implements PR entry and pinned Files changed with component-owned styles. Conversations, saved Questions, Quiz and Semantic review are not yet rebuilt; library and Overview also remain Coming soon. The detailed flows below describe existing backend contracts and the previous UI, not completed functionality in the rebuilt frontend.
+The component-first Vue app supports Files changed, shared inline/panel conversations, saved Questions, Quiz and Semantic review. Library and Overview remain Coming soon where backend capabilities are missing. See [frontend ownership, API contracts and verification limits](web/README.md).
 
 ## Toolchains
 
@@ -23,14 +23,14 @@ npm run dev:web
 
 Open <http://127.0.0.1:5173>, enter a GitHub PR URL (for example `https://github.com/acme/platform/pull/248`), then choose **Load pinned source**. This command uses no Go, Git, harness or credentials. Restarting the server resets its development records; reloading the page resets source/understanding but can reopen an already registered PR. Data and middleware live under `web/development/`, outside the production asset graph. The real-backend mode never falls back to development data.
 
-Current rebuild checks (no native tools required):
+Frontend-only checks (no native tools required):
 
 ```sh
 npm run typecheck:web
 npm run test:web:standalone
 ```
 
-The original `npm run typecheck` and `npm run test:web` remain available; historical tests still reference modules removed by the frontend reset and are being migrated without discarding their behavioral coverage.
+`npm run typecheck` checks the rebuilt application/development tooling and current suites. `npm run test:web` also runs real protected Go HTTP and public-contract checks. Historical suites are preserved under explicit `*:legacy` commands; they still reference removed UI/modules and are not passing current gates. Current passing counts do not imply historical coverage parity.
 
 For development against the real backend, keep using two terminals:
 
@@ -45,7 +45,7 @@ SHELDON_DEV_ORIGIN=http://127.0.0.1:5173 go run ./cmd/sheldon # terminal 2: Go
 
 UI: <http://127.0.0.1:5173> · backend: `127.0.0.1:7331`. Stop any existing standalone instance first. The CLI opens the authenticated UI; the tab reconnects automatically after refresh using session storage.
 
-Connect the runtime, choose **Open a PR**, then **Register and open PR**. Opening from an existing PR uses a separate browser tab; allow that tab to preserve the current pinned view. On the registered page choose **Load pinned source**. If GitHub metadata is unavailable, explicitly choose **Use Git-only fallback**, select a fetched upstream branch, then **Load selected base**. No default target is assumed. Registration and source errors are separate; retry is explicit. Real PR pages offer file filtering, a pinned unified diff, saved Questions, Quiz and Semantic review. Split remains unavailable.
+Connect the runtime, enter a GitHub PR URL, then choose **Open PR** and **Load pinned source**. The CLI can open another PR in a separate browser tab without replacing the current pinned view. If GitHub metadata is unavailable, explicitly choose **Use Git-only fallback**, then load one of the fetched base branches. No default target is assumed. Registration and source errors are separate; retry is explicit. PR pages offer file filtering, a pinned unified diff, saved Questions, Quiz and Semantic review. Split remains unavailable.
 
 Files changed is one continuous pinned comparison. The tree jumps to a file; scrolling updates the active file without fetching. Source rows render as you approach each file and remain mounted for the page visit; the named render action also opens an unrendered file explicitly. **Mark understood** records reversible, self-reported file progress in page memory only, shared with matching Semantic review. A new displayed revision resets it; answers and quiz checks never mark files understood. The theme switch changes only the page palette; dark is the initial theme. File/group and Conversations rails collapse independently without clearing drafts.
 
@@ -71,7 +71,7 @@ After reload/reconnect/restart, open **Quiz** again: the saved set reopens unche
 
 Quiz generation sends compact pinned-repository instructions, not the full diff JSON. Like semantic generation, its separate harness can investigate with restricted Git/gh reads and repository read/search; Sheldon validates returned path/line evidence against its authoritative diff. The old 512-KiB upfront source prompt cap no longer applies. New evidence saves only the exact supporting range, not its entire surrounding hunk or arbitrary nearby lines. A small selection inside a huge hunk can now be used. Each excerpt still has a 200-line / 8-KiB selected-source-and-path budget, with 64 KiB total. Answer keys and grading are unchanged; old saved quizzes with surrounding hunks remain readable without migration. Source-loader and model/time limits remain. See `internal/quiz/README.md` for the exact contract.
 
-**Sample UI previews** opens the separate `/?preview=library` entry. Its Files changed, Questions, Quiz, Semantic review, All PRs and Configuration use fictional data and page-memory simulations, never real PR source or inference.
+`npm run dev:web` serves this same application against local in-memory API handlers. There is no separate preview UI or automatic fallback to development data in real-backend/release mode. The full PR library, Overview metadata and broader configuration are deferred rather than represented by fabricated backend success.
 
 Open **Semantic review** to read saved groups without source loading or inference. With pinned source loaded, **Generate semantic review** explicitly organizes changed ranges across files in separate restricted native context. Regeneration requires confirmation and retains the previous complete result on failure/cancellation. Groups reference verified original code; ungrouped changed lines and non-text changes remain visible, not hidden by a touched-file/hunk count. This is an agent-generated organizing hypothesis, never approval or proof of understanding. Complete results save privately in `reviews/<id>/semantic-review.json`; generation status and reading position are memory-only. Leaving stops observation, not accepted work. After uncertain delivery/saving, explicitly refresh saved state; no automatic resend or shutdown save/retry occurs. Source refresh labels older groups without retargeting them.
 
@@ -122,16 +122,12 @@ Browser tests:
 npm exec --workspace=@sheldon/web -- playwright install chromium # first run
 npm run test:web
 npm run test:release # clean source build + isolated binary/browser checks (Linux/macOS)
-npm run test --workspace=@sheldon/web -- tests/development-semantic.spec.ts # actual offline semantic development flow
-npm run test --workspace=@sheldon/web -- --config playwright.release.config.ts release-semantic.spec.ts # clean-release semantic flow
-npm run test --workspace=@sheldon/web -- --config playwright.release.config.ts release-source.spec.ts # native offline PR flow only
-npm run test --workspace=@sheldon/web -- development-question.spec.ts # actual Go/Vite/Git + synthetic native answers
-npm run test --workspace=@sheldon/web -- --config playwright.release.config.ts release-question.spec.ts # same flow through clean embedded release
-npm run test --workspace=@sheldon/web -- development-quiz.spec.ts # actual Git/API/private quiz save/check/restart
-npm run test --workspace=@sheldon/web -- --config playwright.release.config.ts release-quiz.spec.ts # same quiz flow through clean embedded release
+npm run test:web:standalone # frontend development HTTP/browser flows only
+npm run test:web:backend # real Go instance proof/registration and no-fallback behavior
+npm run test:web:contracts # Go validation of public DTO/evidence/key-withholding fixtures
 ```
 
-Run the frontend and release browser suites separately; they share Playwright's output directory.
+Run frontend and release browser suites separately. Current suites keep private generated artifacts in separate `web/test-results/` subdirectories; do not commit or upload them.
 
 [Foundation CI](.github/workflows/ci.yml) runs these checks on Ubuntu 24.04, starting without generated assets. It also compiles Windows/amd64 and macOS/arm64 tests; that is **not native platform validation**. CI never runs live agent experiments and does not upload private test artifacts.
 
@@ -139,11 +135,11 @@ Release browser checks build a disposable application-source copy without `refs/
 
 The native-source release test needs Go and Git to build disposable tools and local PR objects. It exercises two PRs, explicit Git-only base selection, refresh/retry, restart/cache reuse and active-fetch shutdown through the standalone CLI. Test-only `gh`, Git transport and desktop-opener fixtures stay offline; source HTTP responses are not mocked. No GitHub login, provider setup or live requests are needed.
 
-The semantic development/release flows use actual Git, application HTTP and private storage with synthetic native inference, not application HTTP mocks. They verify separate question/quiz/semantic services, cross-file grouping and complete remainder accounting, competing-tab busy rejection, anchored questions, failed/cancelled replacement, active shutdown and source/harness-free reopening. They also verify compact prompts without embedded inventory, actual pinned Git investigation by the synthetic harness and unchanged conversation permissions. Current offline Linux/Chromium checks passed 188 frontend and 16 clean-release tests, typecheck/build and normal/release Go race/vet; light/dark desktop, 700px, 200%-text and large-inventory screenshots were inspected. These checks do not certify factual grouping quality, live providers, native non-Linux behavior, sandboxing, exactly-once dispatch or power-loss durability.
+Current browser checks cover source, conversations/history, quiz and semantic UI/API flows with deterministic development workers, plus real protected Go instance verification and registration. Clean-release checks use actual Git, application HTTP/private storage and synthetic native inference, not application HTTP mocks. They verify durable question admission, targeted Stop, exact-session restart continuation, separate semantic/question services, quiz checking/cancelled replacement and source/native-free saved reopening. Go contract checks reject leaked public keys, foreign evidence and mismatched revision identities.
 
-The question integration tests use actual browser actions, managed native Git source and production HTTP/SSE handlers, without browser HTTP mocks. A disposable Go executable simulates only the native OpenCode protocol/inference. Development and clean-source release flows cover shared-session threads/follow-ups, cross-tab observation/busy rejection, separate PRs, targeted Stop, failure/recovery, reload/reconnect and app/service restart. Saved rows reopen through the UI and explicitly continue the exact original session, without session replacement/default lookup/prompt replay. Abrupt-exit cases retain saved partial outcomes, classify unfinished turns honestly and fail closed with missing source/native state or unresolved execution. Release application processes have no Node on PATH. Real-provider restart compatibility remains unverified.
+Historical browser suites are retained under `npm run test:web:legacy` and `npm run test:release:legacy`, with their original assertions and known removed-module/UI dependencies. They are not passing gates or proof of current coverage. Backend Go tests remain unchanged. Current UI coverage does not claim full parity with the previous 188/16 browser suites, screen-reader certification, live providers, native non-Linux support, sandboxing, exactly-once dispatch or power-loss durability.
 
-The quiz integration flow also uses no application HTTP mocks. It verifies compact prompts without embedded diff inventory, actual pinned Git investigation by the synthetic harness, separate generation/conversation permissions and native ownership, pre-check key withholding, correct/incorrect backend grading, unchanged conversation files, busy/stale rejection, failed/cancelled replacement, active shutdown and reopening/checking with the original cache and synthetic harness unavailable. Native/Git audits prove reads/checks/reload/restart do not dispatch prompts or load source. Release flows run only the binary plus offline tools, without Node or `refs/` at application runtime. These fixtures do not certify live-provider quiz quality, sandboxing, exactly-once dispatch, power-loss durability or non-Linux compatibility.
+Release application processes run only the binary plus offline fixture tools, without Node or `refs/` at application runtime. Saved reopening/checking dispatches no prompts and loads no source; native/Git audits check those boundaries. Real-provider quality and restart compatibility remain unverified.
 
 ## Layout
 
@@ -162,7 +158,7 @@ internal/semantic/   Validated cross-file grouping, separate generation and save
 internal/opencode/   Restricted native service/session, execution and history adapter
 internal/ui/         Embedded release shell / asset-free development fallback
 scripts/build.js     Frontend → embed copy → Go build
-web/                 Vue workspace + offline previews + browser tests
+web/                 Component-first Vue app + development API + browser tests
 ```
 
 Further launches reuse the running instance. A private `instance.lock` lives in the OS data directory; do not delete it while Sheldon is running.

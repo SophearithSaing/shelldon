@@ -4,11 +4,14 @@ import type { DiffFile } from '../../api/contracts/source'
 import AppButton from '../ui/AppButton.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import UnderstandingProgress from './UnderstandingProgress.vue'
+import { useReadingPosition } from '../../composables/useReadingPosition'
 
-const props = defineProps<{ files: DiffFile[]; active: string; understood: Set<string>; percentage: number; collapsed: boolean }>()
+const props = defineProps<{ files: DiffFile[]; active: string; understood: Set<string>; percentage: number; collapsed: boolean; visible: boolean }>()
 const emit = defineEmits<{ select: [id: string]; collapse: [] }>()
 const filter = ref('')
 const toggle = ref<InstanceType<typeof AppButton> | null>(null)
+const root = ref<HTMLElement | null>(null)
+useReadingPosition(computed((): HTMLElement | null => root.value?.parentElement ?? null), computed((): boolean => props.visible && !props.collapsed))
 const visible = computed((): DiffFile[] => props.files.filter((file): boolean => (file.newPath ?? file.oldPath ?? '').toLowerCase().includes(filter.value.toLowerCase())))
 
 /** Toggles the file rail and retains keyboard focus on its control. */
@@ -20,7 +23,7 @@ async function collapse(): Promise<void> {
 </script>
 
 <template>
-  <div class="file-tree" :class="{ collapsed }">
+  <div ref="root" class="file-tree" :class="{ collapsed }">
     <header><strong v-if="!collapsed">Files changed <span>{{ files.length }}</span></strong><AppButton ref="toggle" variant="quiet" :aria-label="collapsed ? 'Open files panel' : 'Collapse files panel'" :aria-expanded="!collapsed" @click="collapse"><AppIcon name="chevron" :class="collapsed ? 'right' : 'left'" /></AppButton></header>
     <template v-if="!collapsed"><UnderstandingProgress :understood="understood.size" :total="files.length" :percentage="percentage" /><label class="filter"><span>Filter files</span><input v-model="filter" type="search" placeholder="Filter files…" /></label><nav aria-label="Changed files"><button v-for="file in visible" :key="file.id" :title="file.newPath ?? file.oldPath" :aria-current="active === file.id ? 'true' : undefined" @click="$emit('select', file.id)"><AppIcon :name="understood.has(file.id) ? 'checked' : 'circle'" /><span class="path">{{ file.newPath ?? file.oldPath }}</span><span class="change">{{ file.status === 'modified' ? 'M' : file.status === 'added' ? 'A' : file.status === 'deleted' ? 'D' : file.status }}</span></button><p v-if="!visible.length">No matching files.</p></nav></template>
     <span v-else class="rail-progress" title="Self-reported file understanding">{{ percentage }}%</span>
@@ -28,7 +31,7 @@ async function collapse(): Promise<void> {
 </template>
 
 <style scoped>
-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 12px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 12px; position: sticky; top: 0; z-index: 2; background: var(--canvas); }
 header strong { font-size: 12px; white-space: nowrap; }
 header strong span { color: var(--muted); font-size: 10px; margin-left: 5px; }
 .filter { display: block; margin: 12px; }

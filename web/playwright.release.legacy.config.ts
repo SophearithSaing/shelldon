@@ -1,0 +1,11 @@
+import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './tests',
+  outputDir: './test-results/legacy-release',
+  testMatch: ['release.spec.ts', 'release-source.spec.ts', 'release-question.spec.ts', 'release-quiz.spec.ts', 'release-semantic.spec.ts'],
+  workers: 1,
+  reporter: 'list',
+  globalSetup: './tests/release/setup.ts',
+  use: { viewport: { width: 1440, height: 1080 }, trace: 'off' },
+})

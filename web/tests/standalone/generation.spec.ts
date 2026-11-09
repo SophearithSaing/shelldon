@@ -172,3 +172,43 @@ test('saved semantic groups reopen source-free with original quotes and disabled
   await expect(page.getByRole('button', { name: 'View in original diff', exact: true }).first()).toBeDisabled()
   expect(work).toBe(0)
 })
+
+test('generation busy rejection in another tab requires saved refresh, not automatic resend', async ({ page, context }): Promise<void> => {
+  const other = await context.newPage()
+  await open(page, 1510)
+  await load(page)
+  await open(other, 1510)
+  await load(other)
+  await page.getByRole('button', { name: 'Quiz', exact: true }).click()
+  await other.getByRole('button', { name: 'Quiz', exact: true }).click()
+  let mutations = 0
+  other.on('request', (request): void => { if (request.method() === 'POST' && request.url().endsWith('/generations')) mutations++ })
+  await page.getByRole('button', { name: 'Generate quiz', exact: true }).click()
+  await other.getByRole('button', { name: 'Generate quiz', exact: true }).click()
+  await expect(other.getByRole('alert')).toContainText('Another generation is active')
+  await expect(other.getByRole('button', { name: 'Generate quiz', exact: true })).toBeDisabled()
+  await other.getByRole('button', { name: 'Refresh saved quiz', exact: true }).click()
+  await expect(other.getByRole('article', { name: 'Quiz question 1', exact: true })).toBeVisible()
+  expect(mutations).toBe(1)
+})
+
+for (const kind of ['quiz', 'semantic'] as const) test(`failed ${kind} replacement preserves its complete predecessor`, async ({ page }): Promise<void> => {
+  await open(page, kind === 'quiz' ? 1511 : 1512)
+  await load(page)
+  await generate(page, kind)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'generation-failed' })
+  await regenerate(page, kind === 'quiz' ? 'quiz' : 'semantic review')
+  await expect(page.getByText('Last generation: failed', { exact: false })).toBeVisible()
+  if (kind === 'quiz') await expect(page.getByRole('article', { name: 'Quiz question 1', exact: true })).toBeVisible()
+  else await expect(page.getByRole('heading', { name: 'One refresh, many callers', exact: true })).toBeVisible()
+})
+
+test('large saved semantic inventory accounts for every original file', async ({ page }, info): Promise<void> => {
+  await open(page, 1513)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'large-source' })
+  await load(page, 80)
+  await generate(page, 'semantic')
+  await page.getByRole('navigation', { name: 'Semantic groups', exact: true }).getByRole('button', { name: /Ungrouped changes/ }).click()
+  await expect(page.getByRole('article', { name: /^Remaining file / })).toHaveCount(80)
+  await page.screenshot({ path: info.outputPath('large-semantic-inventory.png') })
+})

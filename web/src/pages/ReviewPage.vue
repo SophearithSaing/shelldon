@@ -20,7 +20,7 @@ import QuizView from '../components/quiz/QuizView.vue'
 import SemanticView from '../components/semantic/SemanticView.vue'
 
 const props = defineProps<{ id: string }>()
-const { pr, source, decision, pending, metadataPending, error, understood, activeFile, progress, read, load, refresh, toggleUnderstood } = useReview(toRef(props, 'id'))
+const { pr, source, decision, pending, replacementBlocked, metadataPending, error, understood, activeFile, progress, read, load, refresh, toggleUnderstood } = useReview(toRef(props, 'id'))
 const feature = ref<Feature>('files')
 const filesCollapsed = ref(false)
 const diff = ref<InstanceType<typeof PinnedDiff> | null>(null)
@@ -40,6 +40,7 @@ async function revealSource(): Promise<void> {
 }
 
 watch(q.sourceRequest, revealSource)
+watch(q.draft, (draft): void => { replacementBlocked.value = !!draft }, { flush: 'sync' })
 </script>
 
 <template>
@@ -51,14 +52,14 @@ watch(q.sourceRequest, revealSource)
     <DraftNotice />
     <StatusMessage v-if="q.error.value" tone="error">{{ q.error.value }}</StatusMessage>
     <ReviewLayout v-show="feature === 'files'" :files-collapsed="filesCollapsed" :conversations-collapsed="q.panelCollapsed.value">
-      <template #files><FileTree :files="source?.files ?? []" :active="activeFile" :understood="understood" :percentage="progress" :collapsed="filesCollapsed" @collapse="filesCollapsed = !filesCollapsed" @select="diff?.jump($event)" /></template>
-      <SourceLoader v-if="!source || decision" :pending="pending" :decision="decision" @load="load" />
-      <PinnedDiff v-if="source" ref="diff" :source="source" :understood="understood" @active="activeFile = $event" @understood="toggleUnderstood" />
-      <template #conversations><ConversationsRail :collapsed="q.panelCollapsed.value" @collapse="q.panelCollapsed.value = !q.panelCollapsed.value"><ConversationPanel /></ConversationsRail></template>
+      <template #files><FileTree :files="source?.files ?? []" :visible="feature === 'files'" :active="activeFile" :understood="understood" :percentage="progress" :collapsed="filesCollapsed" @collapse="filesCollapsed = !filesCollapsed" @select="diff?.jump($event)" /></template>
+      <SourceLoader v-if="!source || decision" :pending="pending" :blocked="replacementBlocked" :decision="decision" @load="load" />
+      <PinnedDiff v-if="source" ref="diff" :source="source" :visible="feature === 'files'" :understood="understood" @active="activeFile = $event" @understood="toggleUnderstood" />
+      <template #conversations><ConversationsRail :collapsed="q.panelCollapsed.value" @collapse="q.panelCollapsed.value = !q.panelCollapsed.value"><ConversationPanel :visible="feature === 'files'" /></ConversationsRail></template>
     </ReviewLayout>
     <ComingSoon v-if="feature === 'overview'" title="Pull request overview" description="Description, author details, branches and commits in one place." />
     <SavedQuestions v-show="feature === 'questions'" :active="feature === 'questions'" />
-    <QuizView v-show="feature === 'quiz'" ref="quiz" :pr-id="id" :source="source" :active="feature === 'quiz'" @source="feature = 'files'" />
-    <SemanticView v-show="feature === 'semantic'" ref="semantic" :pr-id="id" :source="source" :active="feature === 'semantic'" :files-collapsed="filesCollapsed" :understood="understood" @source="feature = 'files'" @collapse="filesCollapsed = !filesCollapsed" @understood="toggleUnderstood" />
+    <QuizView v-show="feature === 'quiz'" ref="quiz" :pr-id="id" :source="source" :source-pending="pending" :active="feature === 'quiz'" @source="feature = 'files'" />
+    <SemanticView v-show="feature === 'semantic'" ref="semantic" :pr-id="id" :source="source" :source-pending="pending" :active="feature === 'semantic'" :files-collapsed="filesCollapsed" :understood="understood" @source="feature = 'files'" @collapse="filesCollapsed = !filesCollapsed" @understood="toggleUnderstood" />
   </template>
 </template>

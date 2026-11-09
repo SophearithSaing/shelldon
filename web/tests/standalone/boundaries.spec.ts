@@ -21,6 +21,24 @@ test('large comparison keeps complete inventory while mounting source incrementa
   await page.screenshot({ path: info.outputPath('large-inventory.png') })
 })
 
+test('file-rail and diff reading positions survive collapse and feature switches', async ({ page }): Promise<void> => {
+  await open(page, 1609)
+  await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'large-source' })
+  await load(page, 80)
+  const rail = page.locator('.review-layout:visible > aside.files')
+  const diff = page.locator('.pinned-diff')
+  await rail.evaluate((pane): void => { pane.scrollTop = 300 })
+  await diff.evaluate((pane): void => { pane.scrollTop = 500 })
+  await expect.poll(async (): Promise<number> => rail.evaluate((pane): number => pane.scrollTop)).toBe(300)
+  await page.getByRole('button', { name: 'Collapse files panel', exact: true }).click()
+  await page.getByRole('button', { name: 'Open files panel', exact: true }).click()
+  await expect.poll(async (): Promise<number> => rail.evaluate((pane): number => pane.scrollTop)).toBe(300)
+  await page.getByRole('button', { name: 'Questions', exact: true }).click()
+  await page.getByRole('button', { name: /^Files changed/ }).click()
+  await expect.poll(async (): Promise<number> => rail.evaluate((pane): number => pane.scrollTop)).toBe(300)
+  await expect.poll(async (): Promise<number> => diff.evaluate((pane): number => pane.scrollTop)).toBe(500)
+})
+
 test('explicit Git-only decisions retain the selected base through refresh', async ({ page }): Promise<void> => {
   await open(page, 1602)
   await page.setExtraHTTPHeaders({ 'X-Sheldon-Scenario': 'source-fallback' })
@@ -67,6 +85,22 @@ test('old-side Shift ranges stay in one hunk and native text selection starts no
   await file.getByRole('button', { name: 'Ask about selection', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Initial source question', exact: true })).toContainText('Old L16–18')
   expect(admissions).toBe(0)
+})
+
+test('a draft created during a refresh base decision blocks every source-replacement action', async ({ page }): Promise<void> => {
+  await open(page, 1608)
+  await load(page)
+  await page.route('**/source', async (route): Promise<void> => {
+    const result = await (await route.fetch()).json()
+    await route.fulfill({ json: { state: 'fallback-required', pr: result.pr } })
+  }, { times: 1 })
+  await page.getByRole('button', { name: 'Refresh source', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Use Git-only fallback', exact: true })).toBeEnabled()
+  const initial = await compose(page)
+  await initial.getByRole('textbox').fill('Keep the original comparison through the base decision.')
+  await expect(page.getByRole('button', { name: 'Use Git-only fallback', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Refresh source', exact: true })).toBeDisabled()
+  await expect(initial.getByRole('textbox')).toHaveValue('Keep the original comparison through the base decision.')
 })
 
 test('IME composition never submits initial or follow-up input', async ({ page }): Promise<void> => {

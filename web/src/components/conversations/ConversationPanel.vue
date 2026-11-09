@@ -1,28 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useConversationContext } from '../../composables/useConversations'
 import type { ConversationThread } from '../../composables/useConversations'
 import ConversationView from './ConversationView.vue'
+import { useReadingPosition } from '../../composables/useReadingPosition'
 
 const q = useConversationContext()
+const props = defineProps<{ visible: boolean }>()
 const current = computed((): ConversationThread | undefined => q.threads.value.find((thread): boolean => thread.id === q.selected.value))
 const root = ref<HTMLElement | null>(null)
-const positions = new Map<string, number>()
-
-/**
- * Keeps per-thread reading positions in this panel, independent of inline views.
- * @param next Newly selected thread.
- * @param previous Previously selected thread.
- */
-async function retainPosition(next: string, previous: string): Promise<void> {
-  const pane = root.value?.closest('aside')
-  if (!pane) return
-  positions.set(previous, pane.scrollTop)
-  await nextTick()
-  pane.scrollTop = positions.get(next) ?? 0
-}
-
-watch(q.selected, retainPosition)
+useReadingPosition(computed((): HTMLElement | null => root.value?.closest('aside') ?? null), computed((): boolean => props.visible && !q.panelCollapsed.value), q.selected)
 </script>
 
 <template>

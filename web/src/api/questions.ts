@@ -1,6 +1,7 @@
 import { json, request } from './client'
 import type { Answer, Anchor, ThreadList, ThreadDetail } from './contracts/questions'
 import type { Revision } from './contracts/source'
+import { sameAnchor } from './selection'
 
 /**
  * Admits one explicitly submitted source question.
@@ -80,7 +81,7 @@ export async function observeAnswer(answer: Answer, signal: AbortSignal, receive
         if (event.split('\n').includes('event: answer')) {
           const data = event.split('\n').filter((line): boolean => line.startsWith('data:')).map((line): string => line.slice(5).trimStart()).join('\n')
           const snapshot = JSON.parse(data) as Answer
-          if (snapshot.answerID !== answer.answerID || snapshot.threadID !== answer.threadID || snapshot.prID !== answer.prID || snapshot.revisionID !== answer.revisionID || snapshot.reference?.revisionID !== answer.revisionID || typeof snapshot.text !== 'string' || !['pending', 'streaming', 'completed', 'failed', 'interrupted'].includes(snapshot.state)) throw new Error('Mismatched answer stream.')
+          if (snapshot.answerID !== answer.answerID || snapshot.threadID !== answer.threadID || snapshot.prID !== answer.prID || snapshot.revisionID !== answer.revisionID || snapshot.question !== answer.question || snapshot.reference?.revisionID !== answer.revisionID || !sameAnchor(snapshot.reference.anchor, answer.reference.anchor) || typeof snapshot.text !== 'string' || !['pending', 'streaming', 'completed', 'failed', 'interrupted'].includes(snapshot.state)) throw new Error('Mismatched answer stream.')
           receive(snapshot)
         }
         boundary = buffer.indexOf('\n\n')

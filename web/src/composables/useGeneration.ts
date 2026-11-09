@@ -32,10 +32,11 @@ export function generationActive(status: GenerationStatus | null): boolean {
  * @param prID Registered PR.
  * @param feature Independent generation endpoint.
  * @param source Explicitly loaded source.
+ * @param sourcePending Whether source replacement is in flight.
  * @param active Whether this feature is being observed.
  * @returns Saved-result state and explicit mutation/recovery actions.
  */
-export function useGeneration<T extends GenerationRead>(prID: string, feature: GenerationFeature, source: Readonly<Ref<SourceDiff | null>>, active: Readonly<Ref<boolean>>): GenerationState<T> {
+export function useGeneration<T extends GenerationRead>(prID: string, feature: GenerationFeature, source: Readonly<Ref<SourceDiff | null>>, sourcePending: Readonly<Ref<boolean>>, active: Readonly<Ref<boolean>>): GenerationState<T> {
   const result = shallowRef(null) as ShallowRef<T | null>
   const status = shallowRef<GenerationStatus | null>(null)
   const pending = ref(false)
@@ -153,7 +154,7 @@ export function useGeneration<T extends GenerationRead>(prID: string, feature: G
   }
 
   const busy = computed((): boolean => starting.value || cancelling.value || generationActive(status.value))
-  const canGenerate = computed((): boolean => !!source.value && !!result.value && !pending.value && !busy.value && !blocked.value)
+  const canGenerate = computed((): boolean => !!source.value && !sourcePending.value && !!result.value && !pending.value && !busy.value && !blocked.value)
   watch(active, async (visible): Promise<void> => {
     if (!visible) stopObservation()
     else if (!result.value) await read()

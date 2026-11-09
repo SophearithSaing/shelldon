@@ -4,6 +4,7 @@ import type { DiffFile, DiffLine, SourceDiff } from '../../api/contracts/source'
 import type { SemanticGroup, SemanticRead, SemanticReview } from '../../api/contracts/generation'
 import { useGeneration } from '../../composables/useGeneration'
 import { useConversationContext } from '../../composables/useConversations'
+import { useReadingPosition } from '../../composables/useReadingPosition'
 import GenerationPanel from '../workspace/GenerationPanel.vue'
 import ReviewLayout from '../../layouts/ReviewLayout.vue'
 import ConversationsRail from '../conversations/ConversationsRail.vue'
@@ -12,13 +13,15 @@ import SemanticGroups from './SemanticGroups.vue'
 import SemanticExcerpt from './SemanticExcerpt.vue'
 import RemainingFile from './RemainingFile.vue'
 
-const props = defineProps<{ prId: string; source: SourceDiff | null; active: boolean; filesCollapsed: boolean; understood: Set<string> }>()
+const props = defineProps<{ prId: string; source: SourceDiff | null; sourcePending: boolean; active: boolean; filesCollapsed: boolean; understood: Set<string> }>()
 const emit = defineEmits<{ source: []; collapse: []; understood: [fileID: string] }>()
 const q = useConversationContext()
-const generation = useGeneration<SemanticRead>(props.prId, 'semantic-review', toRef(props, 'source'), toRef(props, 'active'))
+const generation = useGeneration<SemanticRead>(props.prId, 'semantic-review', toRef(props, 'source'), toRef(props, 'sourcePending'), toRef(props, 'active'))
 const review = computed((): SemanticReview | null => generation.result.value?.review ?? null)
 const count = computed((): number | undefined => review.value?.groups.length)
 const selected = ref('')
+const content = ref<HTMLElement | null>(null)
+useReadingPosition(content, toRef(props, 'active'))
 const matching = computed((): boolean => !!review.value && props.source?.revisionID === review.value.diff.revisionID)
 const group = computed((): SemanticGroup | undefined => review.value?.groups.find((item): boolean => item.groupID === selected.value))
 const understoodCount = computed((): number => matching.value ? review.value!.diff.files.filter((file): boolean => props.understood.has(file.id)).length : 0)
@@ -48,9 +51,9 @@ defineExpose({ count })
 <template>
   <GenerationPanel kind="semantic" :has-result="!!review" :source-available="!!source" :older="!!review && !!source && !matching" :busy="generation.busy.value" :pending="generation.pending.value" :blocked="generation.blocked.value" :can-generate="generation.canGenerate.value" :status="generation.status.value" :error="generation.error.value" @generate="generation.start" @cancel="generation.cancel" @refresh="generation.read" @source="emit('source')">
     <ReviewLayout v-if="review" :files-collapsed="filesCollapsed" :conversations-collapsed="q.panelCollapsed.value">
-      <template #files><SemanticGroups :groups="review.groups" :selected="selected" :collapsed="filesCollapsed" :understood="understoodCount" :total="review.diff.files.length" :percentage="percentage" :remainder="remainderCount" @select="selected = $event" @collapse="$emit('collapse')" /></template>
-      <div class="group-content" :key="`${review.reviewID}:${selected}`"><template v-if="group"><header><span>GROUP {{ review.groups.indexOf(group) + 1 }}</span><h3>{{ group.title }}</h3><p>{{ group.explanation }}</p></header><SemanticExcerpt v-for="(range, index) in group.ranges" :key="index" :diff="review.diff" :range="range" :understood="matching && understood.has(range.fileID)" :matching="matching" @understood="$emit('understood', $event)" /></template><template v-else><header><h3>Ungrouped changes</h3><p>{{ remainderCount }} changed lines remain outside the groups. All {{ review.diff.files.length }} changed files, including non-text changes, remain listed below.</p></header><RemainingFile v-for="item in remainder" :key="item.file.id" :file="item.file" :lines="item.lines" :revision-id="review.diff.revisionID" :matching="matching" :understood="matching && understood.has(item.file.id)" @understood="$emit('understood', $event)" /></template></div>
-      <template #conversations><ConversationsRail :collapsed="q.panelCollapsed.value" @collapse="q.panelCollapsed.value = !q.panelCollapsed.value"><ConversationPanel /></ConversationsRail></template>
+      <template #files><SemanticGroups :groups="review.groups" :selected="selected" :visible="active" :collapsed="filesCollapsed" :understood="understoodCount" :total="review.diff.files.length" :percentage="percentage" :remainder="remainderCount" @select="selected = $event" @collapse="$emit('collapse')" /></template>
+      <div ref="content" class="group-content" :key="`${review.reviewID}:${selected}`"><template v-if="group"><header><span>GROUP {{ review.groups.indexOf(group) + 1 }}</span><h3>{{ group.title }}</h3><p>{{ group.explanation }}</p></header><SemanticExcerpt v-for="(range, index) in group.ranges" :key="index" :diff="review.diff" :range="range" :understood="matching && understood.has(range.fileID)" :matching="matching" @understood="$emit('understood', $event)" /></template><template v-else><header><h3>Ungrouped changes</h3><p>{{ remainderCount }} changed lines remain outside the groups. All {{ review.diff.files.length }} changed files, including non-text changes, remain listed below.</p></header><RemainingFile v-for="item in remainder" :key="item.file.id" :file="item.file" :lines="item.lines" :revision-id="review.diff.revisionID" :matching="matching" :understood="matching && understood.has(item.file.id)" @understood="$emit('understood', $event)" /></template></div>
+      <template #conversations><ConversationsRail :collapsed="q.panelCollapsed.value" @collapse="q.panelCollapsed.value = !q.panelCollapsed.value"><ConversationPanel :visible="active" /></ConversationsRail></template>
     </ReviewLayout>
   </GenerationPanel>
 </template>

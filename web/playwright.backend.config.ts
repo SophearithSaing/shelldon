@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/backend',
+  outputDir: './test-results/backend',
   workers: 1,
   reporter: 'list',
   globalSetup: './tests/development/setup.ts',
