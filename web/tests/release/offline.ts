@@ -90,7 +90,7 @@ async function events<T>(path: string): Promise<T[]> {
  * @param options Optional real development CLI/Vite and synthetic native-answer tools.
  * @returns Isolated CLI controller with deterministic native PR source and explicit cleanup.
  */
-export async function offlineCLI(options: { development?: boolean; questions?: boolean; quizzes?: boolean; semantics?: boolean; nativePersistence?: boolean } = {}): Promise<OfflineCLI> {
+export async function offlineCLI(options: { development?: boolean; questions?: boolean; quizzes?: boolean; semantics?: boolean; nativePersistence?: boolean; syntax?: boolean } = {}): Promise<OfflineCLI> {
   const realGit = await executable('git')
   const directory = await mkdtemp(join(tmpdir(), 'sheldon-source-cli-'))
   const tools = join(directory, 'tools')
@@ -271,7 +271,7 @@ export async function offlineCLI(options: { development?: boolean; questions?: b
       if (active.signalCode !== 'SIGKILL') throw new Error('Offline CLI crash did not bypass graceful shutdown.')
       return
     }
-    if (active.exitCode !== 0) throw new Error('Offline source CLI did not stop gracefully.')
+    if (active.exitCode !== 0) throw new Error(`Offline source CLI did not stop gracefully (exit ${active.exitCode}, signal ${active.signalCode}, shutdown deadline ${output.includes('context deadline exceeded')}).`)
     if (current && output.replace(`API token: ${current.token}\n`, '').includes(current.token)) throw new Error('CLI output exposed its credential outside the startup line.')
     if ((await readFile(stateFile)).subarray(1).toString().trim()) throw new Error('Shutdown retained instance credentials.')
     if (current && await fetch(current.url + '/api/health', { signal: AbortSignal.timeout(1000) }).catch((): undefined => undefined)) throw new Error('Shutdown retained a listener.')
@@ -301,7 +301,7 @@ export async function offlineCLI(options: { development?: boolean; questions?: b
     const mergeBase = await git(upstream, 'fork point\n', 'commit-tree', baseTree)
     const baseTip = await git(upstream, 'base branch advanced\n', 'commit-tree', await tree({ 'shared.txt': 'before\n', 'remove.txt': 'delete me\n', 'base-only.txt': 'not a PR change\n' }), '-p', mergeBase)
     const firstText = options.questions ? 'after PR31 <script>literal</script> ' + 'long literal source '.repeat(60) + '\n' + Array.from({ length: 80 }, (_, index: number): string => `fixture source line ${index + 2}`).join('\n') + '\n' : 'after PR31 <script>literal</script>\n'
-    const firstHead = await git(upstream, 'first PR\n', 'commit-tree', await tree({ 'shared.txt': firstText }), '-p', mergeBase)
+    const firstHead = await git(upstream, 'first PR\n', 'commit-tree', await tree({ 'shared.txt': firstText, ...(options.syntax ? { 'syntax.ts': 'export const message: string = "<script>literal</script>"\n' } : {}) }), '-p', mergeBase)
     const secondHead = await git(upstream, 'second PR\n', 'commit-tree', await tree({ 'shared.txt': 'before\n', 'remove.txt': 'delete me\n', 'notes.txt': 'only PR32\n' }), '-p', mergeBase)
     const wrongBase = await git(upstream, 'unrelated default\n', 'commit-tree', await tree({ 'wrong.txt': 'must not be selected automatically\n' }))
     for (const [ref, sha] of Object.entries({ 'refs/heads/release/target': baseTip, 'refs/heads/main': wrongBase, 'refs/pull/31/head': firstHead, 'refs/pull/32/head': secondHead })) await git(upstream, '', 'update-ref', ref, sha)

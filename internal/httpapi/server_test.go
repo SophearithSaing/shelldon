@@ -77,6 +77,35 @@ func request(t *testing.T, s *Server, client *http.Client, method, path, body st
 	return response
 }
 
+func TestShutdownDrainsUnusedBrowserConnection(t *testing.T) {
+	s, err := Listen("127.0.0.1:0", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted := make(chan struct{}, 1)
+	s.http.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			accepted <- struct{}{}
+		}
+	}
+	startTestServer(t, s)
+	connection, err := net.Dial("tcp", s.listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	select {
+	case <-accepted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("browser preconnection was not accepted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := s.Shutdown(ctx); err != nil {
+		t.Fatalf("unused browser connection blocked graceful shutdown: %v", err)
+	}
+}
+
 func TestListenOnlyOnNumericLoopback(t *testing.T) {
 	for _, address := range []string{":0", "0.0.0.0:0", "[::]:0", "192.0.2.1:0", "localhost:0", "example.com:80", "127.0.0.1", "127.0.0.1:65536", "127.0.0.1:+1"} {
 		t.Run(address, func(t *testing.T) {

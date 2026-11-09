@@ -40,6 +40,8 @@ func assetHandler(assets fs.FS) http.Handler {
 				contentType = "font/woff2"
 			case ".txt":
 				contentType = "text/plain; charset=utf-8"
+			case ".png":
+				contentType = "image/png"
 			}
 		}
 		if contentType == "" {
