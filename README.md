@@ -78,6 +78,8 @@ Question backend operations are explicit and authenticated; browsing never start
 
 ## Check & build
 
+Backend-only PR library endpoints support local listing/search and explicit cached GitHub metadata refresh. See the [API contract](internal/httpapi/pr-library.md); the library UI is not connected yet.
+
 ```sh
 go test -race ./...
 go vet ./...
