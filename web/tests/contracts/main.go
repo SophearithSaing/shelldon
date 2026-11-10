@@ -27,6 +27,7 @@ type payload struct {
 	Quiz     quiz.ReadResult         `json:"quiz"`
 	Checked  []quiz.Checked          `json:"checked"`
 	Semantic semantic.ReadResult     `json:"semantic"`
+	Library  githubpr.LibraryResult  `json:"library"`
 }
 
 // registry validates membership without fetching source or starting native work.
@@ -38,6 +39,40 @@ func (r registry) ReadPR(id string) (githubpr.PullRequest, error) {
 		return githubpr.PullRequest{}, os.ErrNotExist
 	}
 	return r.pr, nil
+}
+
+// validateLibrary checks cached lifecycle facts, missing metadata and deterministic paging.
+func validateLibrary(result githubpr.LibraryResult) error {
+	if len(result.Items) == 0 {
+		return errors.New("invalid library membership contract")
+	}
+	for _, row := range result.Items {
+		route, err := githubpr.ReviewPath(row.PR.ID)
+		if row.PR.Validate() != nil || err != nil || row.Route != route {
+			return errors.New("invalid PR library identity")
+		}
+		switch row.MetadataStatus {
+		case "missing", "unavailable":
+			if row.State != "unknown" || row.CreatedAt != nil || row.UpdatedAt != nil || row.MergedAt != nil || row.FetchedAt != nil {
+				return errors.New("invalid unavailable PR metadata")
+			}
+		case "cached":
+			if row.CreatedAt == nil || row.UpdatedAt == nil || row.FetchedAt == nil {
+				return errors.New("incomplete cached PR metadata")
+			}
+			metadata := githubpr.Metadata{SchemaVersion: 1, PRID: row.PR.ID, Title: row.PR.Title, Author: row.PR.Author, State: row.State, CreatedAt: *row.CreatedAt, UpdatedAt: *row.UpdatedAt, MergedAt: row.MergedAt, FetchedAt: *row.FetchedAt}
+			if metadata.Validate(row.PR.ID) != nil {
+				return errors.New("invalid cached PR metadata")
+			}
+		default:
+			return errors.New("invalid PR metadata status")
+		}
+	}
+	selected, err := githubpr.SelectLibrary(result.Items, githubpr.LibraryQuery{State: "all", Limit: 100})
+	if err != nil || !reflect.DeepEqual(selected, result) {
+		return errors.New("invalid PR library counts or paging")
+	}
+	return nil
 }
 
 // validate checks actual backend decoders, identity contracts and public result validators.
@@ -63,6 +98,9 @@ func validate(input payload) error {
 		if err := checked.Validate(input.PR.ID); err != nil {
 			return err
 		}
+	}
+	if err := validateLibrary(input.Library); err != nil {
+		return err
 	}
 	return input.Semantic.Validate(input.PR.ID)
 }

@@ -8,6 +8,7 @@ import type { Locator, Page } from '@playwright/test'
  */
 export async function open(page: Page, number: number): Promise<void> {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Open a PR', exact: true }).click()
   await page.getByLabel('Open a pull request', { exact: true }).fill(`https://github.com/acme/platform/pull/${number}`)
   await page.getByRole('button', { name: 'Open PR', exact: true }).click()
   await expect(page.getByRole('heading', { name: `Deduplicate concurrent session refreshes #${number}` })).toBeVisible()

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { digest, parsePR, sourceFixture } from '../web/development/fixtures/source.ts'
 import { quizFixture, semanticFixture } from '../web/development/fixtures/features.ts'
+import { librarySeed, projectLibraryRow } from '../web/development/fixtures/library.ts'
 import { selectionContext } from '../web/src/api/selection.ts'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -14,6 +15,11 @@ const answer = { answerID: digest('contract-answer'), threadID: digest('contract
 const quiz = quizFixture(diff, digest('contract-quiz'))
 const semantic = semanticFixture(diff, digest('contract-semantic'))
 const generation = { prID: pr.id, generationID: digest('contract-generation'), revisionID: diff.revisionID, sequence: '1', state: 'pending', cancelRequested: false, executionUnknown: false }
+const libraryItems = librarySeed().map((seed) => projectLibraryRow(seed.pr, seed.metadata)).sort((a, b) => {
+  const repository = `${a.pr.owner}/${a.pr.repository}`.localeCompare(`${b.pr.owner}/${b.pr.repository}`)
+  if (repository) return repository
+  return BigInt(a.pr.number) < BigInt(b.pr.number) ? -1 : 1
+})
 const payload = {
   pr,
   source: { state: 'ready', pr, diff },
@@ -24,6 +30,7 @@ const payload = {
   quiz: { prID: pr.id, version: '1', quiz: quiz.quiz, generation: { ...generation, quizID: digest('contract-next-quiz') } },
   checked: quiz.privateQuestions.map((item) => ({ prID: pr.id, version: '1', quizID: quiz.quiz.quizID, revisionID: diff.revisionID, questionID: item.questionID, choiceID: 'b', correct: false, correctChoiceID: item.correctChoiceID, explanation: item.explanation, evidence: item.evidence })),
   semantic: { prID: pr.id, version: '1', review: semantic, generation: { ...generation, generationID: digest('contract-semantic-generation'), reviewID: digest('contract-next-semantic') } },
+  library: { items: libraryItems, total: 8, counts: { open: 4, merged: 2, closed: 1, unknown: 1, all: 8 }, nextOffset: null },
 }
 
 /**

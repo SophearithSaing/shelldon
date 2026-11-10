@@ -7,7 +7,7 @@ npm ci --ignore-scripts
 npm run dev:web
 ```
 
-Open <http://127.0.0.1:5173>, enter a GitHub PR URL, and explicitly load pinned source. This development command starts only Vite and its local HTTP handlers. No Go, Git, OpenCode, credentials or external requests are needed. The application uses normal product UI; library/Overview capabilities without backend contracts say Coming soon.
+Open <http://127.0.0.1:5173>, search the seeded library or enter a GitHub PR URL, and explicitly load pinned source. This development command starts only Vite and its local HTTP handlers. No Go, Git, OpenCode, credentials or external requests are needed. The application uses normal product UI; Overview capabilities without backend contracts say Coming soon.
 
 For the real Go backend, use `npm run dev` and the CLI as documented in the root README. There is one application and one set of browser API clients. No page/component imports fixtures or selects an API mode. Production builds never include the development API or fall back to it on failure.
 
@@ -18,6 +18,7 @@ For the real Go backend, use `npm run dev` and the CLI as documented in the root
 | `src/pages/` | Route-level component composition; no page styles |
 | `src/layouts/` | Application height, responsive columns and supporting pane geometry |
 | `src/components/` | Feature presentation and scoped styles |
+| `src/composables/usePRLibrary.ts` | Registered-library search/filter/paging and explicit metadata refresh |
 | `src/composables/useReview.ts` | Explicit source loading, revision ownership and self-reported progress |
 | `src/composables/useConversations.ts` | One canonical thread/turn/draft owner shared by inline, panel and saved history |
 | `src/composables/useGeneration.ts` | The finite protocol shared by the two separately owned generation features |
@@ -26,9 +27,13 @@ For the real Go backend, use `npm run dev` and the CLI as documented in the root
 | `src/styles/` | Palette tokens, local fonts and base reset only |
 | `development/` | Server-only fixtures, workers, validation and test scenarios |
 
-Source, initial drafts, follow-up drafts, reading position, understanding and quiz practice are page-memory state. Theme/rail/feature changes retain them. A new displayed source revision resets only file understanding; older conversations/results keep their original identities and quotes. Browser reload/disconnect clears page state, not accepted backend work. Development server restart also resets its in-memory records; real private saving remains Go-owned in OS storage.
+Source, initial drafts, follow-up drafts, reading position, understanding and quiz practice are page-memory state. Theme/rail/feature changes retain them. A new displayed source revision resets only file understanding; older conversations/results keep their original identities and quotes. Browser reload/disconnect clears page state, not accepted backend work. Development server restart resets its in-memory records to the seeded baseline; real private saving remains Go-owned in OS storage.
+
+The PR library starts on **All** and uses only registered identity, cached lifecycle/title/author, timestamps and metadata availability. Unknown and closed-unmerged rows stay visible in All. Search submission and filter changes issue fresh local reads; pagination appends the advertised offset. A row opens its canonical review route without loading source. Refresh is a separate explicit metadata operation followed by a reread of the current filtered view. Failures retain the prior readable rows; after a successful refresh with failed reread, the UI says metadata was saved rather than reporting the whole operation as failed. Reference-only review progress, change totals and Continue review state are not fabricated.
 
 The conversation dropdown remains a native select. Its menu is customized with CSS `appearance: base-select` / `::picker(select)` where supported, including theme colors, selected/hover states, wrapping labels and bounded scrolling. Opening, keyboard navigation, selection, dismissal and focus stay browser-owned; no custom dropdown JavaScript is added. Other browsers retain the styled native control, and forced-colors mode restores native presentation.
+
+The home page is library-first: one aligned heading, filters/search and registered rows. **Open a PR** reveals a compact URL form and focuses its input without leaving the list. Only a successfully read, unsearched empty library shows the larger welcome headline and form; filtered empty results, loading and capability failures do not masquerade as first use.
 
 ## Syntax highlighting
 
@@ -45,7 +50,9 @@ All browser API calls use the same `/api/...` paths in both modes. IDs are canon
 | Operation | Request / response |
 | --- | --- |
 | `POST /api/open` | `{url}` → 202 `{prID, route}`; registration alone loads no source |
+| `GET /api/reviews` | Local registered rows with `q`, `state=all/open/merged`, `limit` and `offset`; search-scoped counts and nullable `nextOffset` |
 | `GET /api/reviews/<pr>` | Canonical registered PR metadata |
+| `POST .../metadata/refresh` | `{}` → one bounded GitHub display observation and its saved library row; no source work |
 | `POST .../source` | Explicit `load`, `refresh`, `git-only` or `select-base`; complete pinned diff or a required base decision |
 | `POST .../questions` | `{revision, anchor, question}` → 202 cumulative `Answer` admission |
 | `POST .../threads/<thread>/answers` | `{revisionID, question}`; continues only the original thread |
@@ -75,6 +82,7 @@ SHELDON_WEB_SCENARIO=answer-save-failed npm run dev:web
 
 Test tooling can select the same scenarios per request with `X-Sheldon-Scenario`; no product controls or production handlers use this header. Available scenarios:
 
+- Library: `library-failed`, `metadata-failed`, `metadata-busy`.
 - Source: `source-failed`, `source-fallback`, `source-empty`, `source-nontext`, `large-source` (80 files), `new-revision`.
 - Questions: `answer-slow`, `answer-failed`, `answer-unknown`, `answer-save-failed`, `admission-uncertain`.
 - Generation: `generation-failed`, `generation-save-uncertain`, `generation-unknown`, `generation-admission-uncertain`.

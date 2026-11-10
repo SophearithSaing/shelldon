@@ -10,6 +10,7 @@ import type { SourceResponse } from '../../src/api/contracts/source'
  */
 async function open(page: Page, number: number): Promise<void> {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Open a PR', exact: true }).click()
   await page.getByLabel('Open a pull request', { exact: true }).fill(`https://github.com/acme/platform/pull/${number}`)
   await page.getByRole('button', { name: 'Open PR', exact: true }).click()
   await expect(page.getByRole('heading', { name: `Deduplicate concurrent session refreshes #${number}` })).toBeVisible()
@@ -69,7 +70,7 @@ test('development API uses canonical Go identity and source response shapes', as
   expect((await request.post('/api/open', { data: { url: 'https://github.com/acme/platform/pull/18446744073709551616' } })).status()).toBe(400)
   expect((await request.post('/api/open', { data: 'not json' })).status()).toBe(415)
   expect((await request.post('/api/open', { data: { url: 'x'.repeat(4100) } })).status()).toBe(413)
-  expect((await request.get('/api/reviews')).status()).toBe(404)
+  expect((await request.get('/api/reviews')).status()).toBe(200)
 })
 
 test('tree navigation, theme and rails retain local progress without loading source', async ({ page }): Promise<void> => {
@@ -127,6 +128,7 @@ test('old source response cannot replace a newly routed PR', async ({ page }): P
   await page.getByRole('button', { name: 'Load pinned source', exact: true }).click()
   await received
   await page.getByRole('link', { name: 'Sheldon home', exact: true }).click()
+  await page.getByRole('button', { name: 'Open a PR', exact: true }).click()
   await page.getByLabel('Open a pull request', { exact: true }).fill('https://github.com/acme/platform/pull/1306')
   await page.getByRole('button', { name: 'Open PR', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Deduplicate concurrent session refreshes #1306' })).toBeVisible()
@@ -136,10 +138,8 @@ test('old source response cannot replace a newly routed PR', async ({ page }): P
   await expect(page.getByRole('article')).toHaveCount(0)
 })
 
-test('unsupported library and Overview say Coming soon without fake operations', async ({ page }): Promise<void> => {
+test('unsupported Overview says Coming soon without fake operations', async ({ page }): Promise<void> => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Your pull requests, together' })).toBeVisible()
-  await expect(page.getByText('Coming soon', { exact: true })).toBeVisible()
   await page.getByText('Asset licenses', { exact: true }).click()
   for (const link of await page.locator('.licenses a').all()) {
     const response = await page.request.get((await link.getAttribute('href'))!)

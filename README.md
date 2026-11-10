@@ -4,7 +4,7 @@
 
 A local pull-request explainer. Read pinned changes, ask at the source, practice with a quiz and explore related changes by intent.
 
-The component-first Vue app supports Files changed, shared inline/panel conversations, saved Questions, Quiz and Semantic review. Library and Overview remain Coming soon where backend capabilities are missing. See [frontend ownership, API contracts and verification limits](web/README.md).
+The component-first Vue app supports the registered PR library, Files changed, shared inline/panel conversations, saved Questions, Quiz and Semantic review. Overview remains Coming soon where backend capabilities are missing. See [frontend ownership, API contracts and verification limits](web/README.md).
 
 ## Toolchains
 
@@ -14,7 +14,7 @@ Browser checks also need Playwright Chromium and its system libraries. Tests use
 
 ## Develop
 
-Frontend only, with an in-memory development HTTP API and seeded source:
+Frontend only, with an in-memory development HTTP API and seeded library/source:
 
 ```sh
 npm ci --ignore-scripts
@@ -47,6 +47,8 @@ UI: <http://127.0.0.1:5173> · backend: `127.0.0.1:7331`. Stop any existing stan
 
 Connect the runtime, enter a GitHub PR URL, then choose **Open PR** and **Load pinned source**. The CLI can open another PR in a separate browser tab without replacing the current pinned view. If GitHub metadata is unavailable, explicitly choose **Use Git-only fallback**, then load one of the fetched base branches. No default target is assumed. Registration and source errors are separate; retry is explicit. PR pages offer file filtering, a pinned unified diff, saved Questions, Quiz and Semantic review. Split remains unavailable.
 
+The home library defaults to **All**, so newly registered PRs remain visible with **Unknown / Metadata not fetched** until you choose **Refresh** on their row. Search matches cached title, canonical repository and PR number; **Open** and **Merged** filters include only observed states. Opening a row does not load source. Metadata refresh updates cached display facts only, never pinned source or review progress. Failed reads/refreshes retain readable rows and require an explicit retry.
+
 Files changed is one continuous pinned comparison. The tree jumps to a file; scrolling updates the active file without fetching. Source rows render as you approach each file and remain mounted for the page visit; the named render action also opens an unrendered file explicitly. **Mark understood** records reversible, self-reported file progress in page memory only, shared with matching Semantic review. A new displayed revision resets it; answers and quiz checks never mark files understood. The theme switch changes only the page palette; dark is the initial theme. File/group and Conversations rails collapse independently without clearing drafts.
 
 Source syntax uses **GitHub Light** and **Ayu Dark** with the theme switch, including semantic excerpts, pinned context and quiz evidence. Grammars load locally on demand; unsupported or oversized excerpts stay plain text without hiding source. Highlighting never changes source text or diff backgrounds.
@@ -73,7 +75,7 @@ After reload/reconnect/restart, open **Quiz** again: the saved set reopens unche
 
 Quiz generation sends compact pinned-repository instructions, not the full diff JSON. Like semantic generation, its separate harness can investigate with restricted Git/gh reads and repository read/search; Sheldon validates returned path/line evidence against its authoritative diff. The old 512-KiB upfront source prompt cap no longer applies. New evidence saves only the exact supporting range, not its entire surrounding hunk or arbitrary nearby lines. A small selection inside a huge hunk can now be used. Each excerpt still has a 200-line / 8-KiB selected-source-and-path budget, with 64 KiB total. Answer keys and grading are unchanged; old saved quizzes with surrounding hunks remain readable without migration. Source-loader and model/time limits remain. See `internal/quiz/README.md` for the exact contract.
 
-`npm run dev:web` serves this same application against local in-memory API handlers. Real-backend/release mode never falls back to development data. The full PR library, Overview metadata and broader configuration are deferred rather than represented by fabricated backend success.
+`npm run dev:web` serves this same application against local in-memory API handlers. Real-backend/release mode never falls back to development data. Overview metadata and broader configuration are deferred rather than represented by fabricated backend success.
 
 Open **Semantic review** to read saved groups without source loading or inference. With pinned source loaded, **Generate semantic review** explicitly organizes changed ranges across files in separate restricted native context. Regeneration requires confirmation and retains the previous complete result on failure/cancellation. Groups reference verified original code; ungrouped changed lines and non-text changes remain visible, not hidden by a touched-file/hunk count. This is an agent-generated organizing hypothesis, never approval or proof of understanding. Complete results save privately in `reviews/<id>/semantic-review.json`; generation status and reading position are memory-only. Leaving stops observation, not accepted work. After uncertain delivery/saving, explicitly refresh saved state; no automatic resend or shutdown save/retry occurs. Source refresh labels older groups without retargeting them.
 
@@ -104,7 +106,7 @@ Question backend operations are explicit and authenticated; browsing never start
 
 ## Check & build
 
-Backend-only PR library endpoints support local listing/search and explicit cached GitHub metadata refresh. See the [API contract](internal/httpapi/pr-library.md); the library UI is not connected yet.
+The PR library lists registered PRs with local search, lifecycle filters and pagination. Metadata refresh is explicit per PR; list reads and navigation start no GitHub/source/native work. See the [API contract](internal/httpapi/pr-library.md).
 
 ```sh
 go test -race ./...
