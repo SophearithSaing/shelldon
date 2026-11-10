@@ -1,6 +1,6 @@
 # PR library API
 
-The library contains only PRs registered through `POST /api/open` or the CLI, not a GitHub inbox. Frontend integration is not included. Both endpoints use existing bearer, Host and Origin protections and return `Cache-Control: no-store`. Errors contain a fixed `error` string, never native output or private paths.
+The library contains only PRs registered through `POST /api/open` or the CLI, not a GitHub inbox. The frontend uses these contracts through shared browser clients; standalone development handlers provide separate in-memory data and never serve as a real-backend fallback. Both endpoints use existing bearer, Host and Origin protections and return `Cache-Control: no-store`. Errors contain a fixed `error` string, never native output or private paths.
 
 ## Read local library
 
