@@ -38,6 +38,7 @@ test('library searches and filters real registered rows before opening without s
 
 test('new registration remains discoverable as unknown until explicit metadata refresh', async ({ page }): Promise<void> => {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Open a PR', exact: true }).click()
   await page.getByLabel('Open a pull request', { exact: true }).fill('https://github.com/isolated/library/pull/2201')
   await page.getByRole('button', { name: 'Open PR', exact: true }).click()
   await page.getByRole('link', { name: 'Sheldon home', exact: true }).click()
@@ -172,6 +173,20 @@ test('load more stays bound to the successful query through search edits and fai
   await expect(rows).toHaveCount(2)
   await expect(rows.first()).toContainText('Keep source actions reachable at narrow widths')
   await expect(more).toHaveCount(0)
+})
+
+test('empty library welcomes first use without showing a second page or search-empty state', async ({ page }, info): Promise<void> => {
+  await page.route('**/api/reviews?*', async (route): Promise<void> => {
+    await route.fulfill({ json: { items: [], total: 0, counts: { all: 0, open: 0, merged: 0, closed: 0, unknown: 0 }, nextOffset: null } })
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pull requests')
+  await expect(page.getByRole('heading', { level: 2 })).toContainText('Understand the changes.')
+  await expect(page.getByLabel('Open a pull request', { exact: true })).toBeVisible()
+  await expect(page.locator('.toolbar, .empty')).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('library-empty-dark.png') })
+  await page.setViewportSize({ width: 700, height: 900 })
+  await page.screenshot({ path: info.outputPath('library-empty-narrow.png') })
 })
 
 test('library presentation stays readable in both themes and narrow layouts', async ({ page }, info): Promise<void> => {

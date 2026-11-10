@@ -12,6 +12,7 @@ interface PRLibraryState {
   total: Ref<number>
   nextOffset: Ref<number | null>
   canLoadMore: ComputedRef<boolean>
+  emptyLibrary: ComputedRef<boolean>
   loaded: Ref<boolean>
   pending: Ref<boolean>
   refreshingID: Ref<string>
@@ -37,6 +38,7 @@ export function usePRLibrary(): PRLibraryState {
   const refreshingID = ref('')
   const error = ref('')
   const loadedQuery = shallowRef<LibraryQuery | null>(null)
+  const emptyLibrary = computed((): boolean => loaded.value && !error.value && loadedQuery.value?.search === '' && counts.value.all === 0)
   const canLoadMore = computed((): boolean => nextOffset.value !== null && !pending.value && !error.value && loadedQuery.value?.search === search.value.trim() && loadedQuery.value.state === state.value)
   let listController: AbortController | null = null
   let refreshController: AbortController | null = null
@@ -112,5 +114,5 @@ export function usePRLibrary(): PRLibraryState {
     refreshController?.abort()
   })
   void load()
-  return { search, state, items, counts, total, nextOffset, canLoadMore, loaded, pending, refreshingID, error, load, selectState, refresh }
+  return { search, state, items, counts, total, nextOffset, canLoadMore, emptyLibrary, loaded, pending, refreshingID, error, load, selectState, refresh }
 }

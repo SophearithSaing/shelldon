@@ -87,7 +87,8 @@ test('clean embedded release serves local assets/licenses and a real empty libra
   expect(response?.headers()['content-security-policy']).not.toContain('unsafe-inline')
   await expect(page.getByRole('button', { name: 'Connected', exact: true })).toBeVisible()
   expect(new URL(page.url()).hash).toBe('')
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Understand the changes.')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pull requests')
+  await expect(page.getByRole('heading', { level: 2 })).toContainText('Understand the changes.')
   const iconURL = await page.locator('link[rel="icon"][sizes="32x32"]').evaluate((link): string => (link as HTMLLinkElement).href)
   expect(new URL(iconURL).origin).toBe(record.url)
   const favicon = await page.request.get(iconURL)
@@ -112,7 +113,8 @@ test('clean embedded release serves local assets/licenses and a real empty libra
     expect((await license.text()).length).toBeGreaterThan((await link.textContent())?.includes('Syntax highlighting') ? 3000 : 4000)
   }
   for (const script of scripts) expect(await (await page.request.get(script)).text()).not.toMatch(/sheldon-development-api|Deduplicate concurrent session refreshes|requestToken.mockRejectedValueOnce/)
-  await expect(page.getByText('No registered pull requests yet.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'PR registration', exact: true })).toBeVisible()
+  await expect(page.locator('.toolbar, .empty')).toHaveCount(0)
   let sourceRequests = 0
   page.on('request', (request): void => { if (request.url().endsWith('/source')) sourceRequests++ })
   await page.getByLabel('Open a pull request', { exact: true }).fill('https://github.com/release/library/pull/250')

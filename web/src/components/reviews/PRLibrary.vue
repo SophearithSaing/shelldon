@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { usePRLibrary } from '../../composables/usePRLibrary'
 import { navigate } from '../../composables/navigation'
 import type { LibraryFilter, LibraryLifecycle, LibraryRow } from '../../api/contracts/library'
 import AppButton from '../ui/AppButton.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import StatusMessage from '../ui/StatusMessage.vue'
+import OpenReviewForm from './OpenReviewForm.vue'
 
 const library = usePRLibrary()
+const formOpen = ref(false)
 const filters: { value: LibraryFilter; label: string }[] = [{ value: 'all', label: 'All' }, { value: 'open', label: 'Open' }, { value: 'merged', label: 'Merged' }]
 const dateFormatter = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 
@@ -54,11 +57,14 @@ function metadataLabel(row: LibraryRow): string {
 <template>
   <section class="pr-library" aria-labelledby="library-title">
     <header class="library-heading">
-      <div><span class="eyebrow">YOUR REVIEW WORKSPACE</span><h2 id="library-title">Pull requests</h2><p>Find a registered PR and pick up your review.</p></div>
+      <div><h1 id="library-title">Pull requests</h1><p v-if="!library.emptyLibrary.value">Slow down. Understand the changes.</p></div>
+      <AppButton v-if="!library.emptyLibrary.value" variant="primary" :aria-expanded="formOpen" aria-controls="open-pr-form" @click="formOpen = true">Open a PR</AppButton>
       <span v-if="library.pending.value && library.loaded.value" class="updating" role="status">Updating…</span>
     </header>
 
-    <div class="toolbar">
+    <OpenReviewForm v-if="formOpen || library.emptyLibrary.value" id="open-pr-form" :welcome="library.emptyLibrary.value" :autofocus="formOpen" @opened="navigate" />
+
+    <div v-if="!library.emptyLibrary.value" class="toolbar">
       <nav class="filters" aria-label="PR status">
         <button v-for="filter in filters" :key="filter.value" type="button" :class="{ active: library.state.value === filter.value }" :aria-pressed="library.state.value === filter.value" @click="library.selectState(filter.value)">{{ filter.label }} <span>{{ library.counts.value[filter.value] }}</span></button>
       </nav>
@@ -89,12 +95,12 @@ function metadataLabel(row: LibraryRow): string {
       </ul>
     </div>
 
-    <div v-else-if="library.loaded.value && !library.pending.value" class="empty">
+    <div v-else-if="library.loaded.value && !library.pending.value && !library.emptyLibrary.value" class="empty">
       <strong>{{ library.search.value.trim() || library.state.value !== 'all' ? 'No pull requests match.' : 'No registered pull requests yet.' }}</strong>
       <p>{{ library.search.value.trim() || library.state.value !== 'all' ? 'Try a different search or choose All.' : 'Open a GitHub PR above to add it to this library.' }}</p>
     </div>
 
-    <footer v-if="library.loaded.value" class="library-footer">
+    <footer v-if="library.loaded.value && !library.emptyLibrary.value" class="library-footer">
       <span>{{ library.total.value }} pull request{{ library.total.value === 1 ? '' : 's' }}<template v-if="library.nextOffset.value !== null"> · {{ library.items.value.length }} loaded</template></span>
       <AppButton v-if="library.canLoadMore.value" @click="library.load(true)">Load more</AppButton>
       <span v-else>Metadata refreshes only when you ask.</span>
@@ -103,10 +109,9 @@ function metadataLabel(row: LibraryRow): string {
 </template>
 
 <style scoped>
-.pr-library { width: min(100% - 40px, 1180px); margin: 24px auto 56px; }
+.pr-library { width: min(100% - 40px, 1180px); margin: 48px auto 40px; }
 .library-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
-.eyebrow { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: 1.8px; }
-h2 { margin: 8px 0 4px; font-size: 30px; line-height: 1.2; letter-spacing: -.7px; }
+h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.2; letter-spacing: -.7px; }
 .library-heading p { margin: 0; color: var(--muted); }
 .updating { color: var(--muted); font-size: 11px; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 16px; }

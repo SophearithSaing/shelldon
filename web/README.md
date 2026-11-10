@@ -33,6 +33,8 @@ The PR library starts on **All** and uses only registered identity, cached lifec
 
 The conversation dropdown remains a native select. Its menu is customized with CSS `appearance: base-select` / `::picker(select)` where supported, including theme colors, selected/hover states, wrapping labels and bounded scrolling. Opening, keyboard navigation, selection, dismissal and focus stay browser-owned; no custom dropdown JavaScript is added. Other browsers retain the styled native control, and forced-colors mode restores native presentation.
 
+The home page is library-first: one aligned heading, filters/search and registered rows. **Open a PR** reveals a compact URL form and focuses its input without leaving the list. Only a successfully read, unsearched empty library shows the larger welcome headline and form; filtered empty results, loading and capability failures do not masquerade as first use.
+
 ## Syntax highlighting
 
 Shiki 4.6.0 colors literal source with **GitHub Light** and **Ayu Dark**, following the app's theme switch. `SyntaxText.vue` renders escaped Vue text spans with external CSS classes, never HTML injection or inline token styles. Diff/selection backgrounds and line identities remain unchanged. The JavaScript regex engine needs neither WASM nor an eval exception in the release CSP. Themes, engine and path-selected grammars load from local bundled chunks; no CDN or backend calls are involved.

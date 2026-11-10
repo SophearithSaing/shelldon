@@ -10,6 +10,7 @@ import type { SourceResponse } from '../../src/api/contracts/source'
  */
 async function open(page: Page, number: number): Promise<void> {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Open a PR', exact: true }).click()
   await page.getByLabel('Open a pull request', { exact: true }).fill(`https://github.com/acme/platform/pull/${number}`)
   await page.getByRole('button', { name: 'Open PR', exact: true }).click()
   await expect(page.getByRole('heading', { name: `Deduplicate concurrent session refreshes #${number}` })).toBeVisible()
@@ -127,6 +128,7 @@ test('old source response cannot replace a newly routed PR', async ({ page }): P
   await page.getByRole('button', { name: 'Load pinned source', exact: true }).click()
   await received
   await page.getByRole('link', { name: 'Sheldon home', exact: true }).click()
+  await page.getByRole('button', { name: 'Open a PR', exact: true }).click()
   await page.getByLabel('Open a pull request', { exact: true }).fill('https://github.com/acme/platform/pull/1306')
   await page.getByRole('button', { name: 'Open PR', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Deduplicate concurrent session refreshes #1306' })).toBeVisible()
