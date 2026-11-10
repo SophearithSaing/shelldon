@@ -69,7 +69,7 @@ test('development API uses canonical Go identity and source response shapes', as
   expect((await request.post('/api/open', { data: { url: 'https://github.com/acme/platform/pull/18446744073709551616' } })).status()).toBe(400)
   expect((await request.post('/api/open', { data: 'not json' })).status()).toBe(415)
   expect((await request.post('/api/open', { data: { url: 'x'.repeat(4100) } })).status()).toBe(413)
-  expect((await request.get('/api/reviews')).status()).toBe(404)
+  expect((await request.get('/api/reviews')).status()).toBe(200)
 })
 
 test('tree navigation, theme and rails retain local progress without loading source', async ({ page }): Promise<void> => {
@@ -136,10 +136,8 @@ test('old source response cannot replace a newly routed PR', async ({ page }): P
   await expect(page.getByRole('article')).toHaveCount(0)
 })
 
-test('unsupported library and Overview say Coming soon without fake operations', async ({ page }): Promise<void> => {
+test('unsupported Overview says Coming soon without fake operations', async ({ page }): Promise<void> => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Your pull requests, together' })).toBeVisible()
-  await expect(page.getByText('Coming soon', { exact: true })).toBeVisible()
   await page.getByText('Asset licenses', { exact: true }).click()
   for (const link of await page.locator('.licenses a').all()) {
     const response = await page.request.get((await link.getAttribute('href'))!)

@@ -76,7 +76,7 @@ test('embedded syntax chunks render both palettes under the unchanged release CS
   } finally { await fixture.close() }
 })
 
-test('clean embedded release serves local assets/licenses and contains no development API', async ({ page }): Promise<void> => {
+test('clean embedded release serves local assets/licenses and a real empty library without development API', async ({ page }): Promise<void> => {
   const record = JSON.parse((await readFile(process.env.SHELDON_RELEASE_STATE!)).subarray(1).toString()) as { url: string; token: string }
   const failures: string[] = []
   const scripts: string[] = []
@@ -112,7 +112,25 @@ test('clean embedded release serves local assets/licenses and contains no develo
     expect((await license.text()).length).toBeGreaterThan((await link.textContent())?.includes('Syntax highlighting') ? 3000 : 4000)
   }
   for (const script of scripts) expect(await (await page.request.get(script)).text()).not.toMatch(/sheldon-development-api|Deduplicate concurrent session refreshes|requestToken.mockRejectedValueOnce/)
+  await expect(page.getByText('No registered pull requests yet.', { exact: true })).toBeVisible()
+  let sourceRequests = 0
+  page.on('request', (request): void => { if (request.url().endsWith('/source')) sourceRequests++ })
+  await page.getByLabel('Open a pull request', { exact: true }).fill('https://github.com/release/library/pull/250')
+  await page.getByRole('button', { name: 'Open PR', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Pull request #250', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'Sheldon home', exact: true }).click()
+  const row = page.locator('.pr-row')
+  await expect(row).toHaveCount(1)
+  await expect(row).toContainText('Unknown')
+  await expect(row).toContainText('Metadata not fetched')
   expect(failures).toEqual([])
+  await row.getByRole('button', { name: 'Refresh metadata for Pull request #250', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('GitHub metadata unavailable; cached data was preserved')
+  await expect(row).toContainText('Unknown')
+  await expect(row).toContainText('Metadata not fetched')
+  expect(sourceRequests).toBe(0)
+  expect(failures).toHaveLength(1)
+  expect(failures[0]).toContain('502 (Bad Gateway)')
 })
 
 test('real Git, durable questions, targeted Stop and exact-session restart work through the embedded UI', async ({ page }): Promise<void> => {

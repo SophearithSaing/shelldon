@@ -5,6 +5,7 @@ import { digest, parsePR, sourceFixture } from './fixtures/source.ts'
 import { body, RequestError, sameRevision, scenario, send } from './http.ts'
 import { createQuestionAPI } from './questions.ts'
 import { createGenerationAPI } from './generation.ts'
+import { createLibraryAPI } from './library.ts'
 
 /**
  * Installs development-only API services with independently owned in-memory state.
@@ -16,6 +17,7 @@ export function developmentAPI(): Plugin {
   const revisions = new Map<string, SourceDiff>()
   const questions = createQuestionAPI()
   const generations = createGenerationAPI()
+  const library = createLibraryAPI(reviews)
 
   /**
    * Handles same-origin application requests without external services.
@@ -24,7 +26,11 @@ export function developmentAPI(): Plugin {
    */
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url!, 'http://127.0.0.1')
-    if (url.search || request.url?.includes('?')) throw new RequestError(400, 'API query parameters are not supported.')
+    if (url.pathname === '/api/reviews' && request.method === 'GET') { library.list(request, response, url.search.slice(1)); return }
+    if (url.search || request.url?.includes('?')) {
+      if (url.pathname.endsWith('/metadata/refresh')) throw new RequestError(404, 'Operation not found.')
+      throw new RequestError(400, 'API query parameters are not supported.')
+    }
     if (url.pathname === '/api/health' && request.method === 'GET') { send(response, 200, { status: 'ok' }); return }
     if (url.pathname === '/api/open' && request.method === 'POST') {
       const input = await body(request, ['url'])
@@ -39,6 +45,11 @@ export function developmentAPI(): Plugin {
     const pr = reviews.get(match[1]!)
     if (!pr) throw new RequestError(404, 'PR is not registered. Open its GitHub URL again.')
     const path = match[2] ?? ''
+    if (path === '/metadata/refresh') {
+      if (request.method !== 'POST') throw new RequestError(404, 'Operation not found.')
+      await library.refresh(request, response, pr)
+      return
+    }
     if (!path && request.method === 'GET') { send(response, 200, pr); return }
     if (path === '/source' && request.method === 'POST') {
       const input = await body(request, ['action', 'branch', 'sha', 'revision'])

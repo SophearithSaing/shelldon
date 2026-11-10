@@ -26,6 +26,8 @@ test('real Go verification, registration and tab-scoped reconnect use the same f
 test('real backend capability failure never falls back to development source or fixture titles', async ({ page }): Promise<void> => {
   const state = await connection()
   await page.goto(`/#token=${state.token}`)
+  await expect(page.getByRole('alert')).toContainText('PR library is unavailable')
+  await expect(page.locator('.pr-library')).not.toContainText('Deduplicate concurrent session refreshes')
   await page.getByLabel('Open a pull request', { exact: true }).fill('https://github.com/contract/native/pull/1702')
   await page.getByRole('button', { name: 'Open PR', exact: true }).click()
   await page.getByRole('button', { name: 'Load pinned source', exact: true }).click()

@@ -6,9 +6,11 @@ import agent from '../../assets/material/smart_toy.svg?url'
 import chevron from '../../assets/material/expand_more.svg?url'
 import checked from '../../assets/material/check_circle.svg?url'
 import circle from '../../assets/material/circle.svg?url'
+import merge from '../../assets/material/merge.svg?url'
+import refresh from '../../assets/material/refresh.svg?url'
 
-defineProps<{ name: 'dark' | 'light' | 'person' | 'agent' | 'chevron' | 'checked' | 'circle' }>()
-const icons = { dark, light, person, agent, chevron, checked, circle }
+defineProps<{ name: 'dark' | 'light' | 'person' | 'agent' | 'chevron' | 'checked' | 'circle' | 'merge' | 'refresh' }>()
+const icons = { dark, light, person, agent, chevron, checked, circle, merge, refresh }
 </script>
 
 <template><span class="icon" aria-hidden="true" :style="{ maskImage: 'url(' + JSON.stringify(icons[name]) + ')' }" /></template>
