@@ -23,6 +23,8 @@ npm run dev:web
 
 Open <http://127.0.0.1:5173>, enter a GitHub PR URL (for example `https://github.com/acme/platform/pull/248`), then choose **Load pinned source**. This command uses no Go, Git, harness or credentials. Restarting the server resets its development records; reloading the page resets source/understanding but can reopen an already registered PR. Data and middleware live under `web/development/`, outside the production asset graph. The real-backend mode never falls back to development data.
 
+Vite prefers port 5173 and automatically tries the next free port when it is busy; open the URL printed in the terminal. Setting `SHELDON_DEV_ORIGIN` pins that exact origin and fails rather than silently moving if its port is occupied.
+
 Frontend-only checks (no native tools required):
 
 ```sh
@@ -43,7 +45,7 @@ npm run dev # terminal 1: Vite
 SHELDON_DEV_ORIGIN=http://127.0.0.1:5173 go run ./cmd/sheldon # terminal 2: Go
 ```
 
-UI: <http://127.0.0.1:5173> · backend: `127.0.0.1:7331`. Stop any existing standalone instance first. The CLI opens the authenticated UI; the tab reconnects automatically after refresh using session storage.
+UI defaults to <http://127.0.0.1:5173> · backend: `127.0.0.1:7331`. If Vite selects another port, set the Go command's `SHELDON_DEV_ORIGIN` to that printed origin. The CLI opens the authenticated UI; the tab reconnects automatically after refresh using session storage.
 
 Connect the runtime, enter a GitHub PR URL, then choose **Open PR** and **Load pinned source**. The CLI can open another PR in a separate browser tab without replacing the current pinned view. If GitHub metadata is unavailable, explicitly choose **Use Git-only fallback**, then load one of the fetched base branches. No default target is assumed. Registration and source errors are separate; retry is explicit. PR pages offer file filtering, a pinned unified diff, saved Questions, Quiz and Semantic review. Split remains unavailable.
 
@@ -51,7 +53,7 @@ The home library defaults to **All**, so newly registered PRs remain visible wit
 
 Files changed is one continuous pinned comparison. The tree jumps to a file; scrolling updates the active file without fetching. Source rows render as you approach each file and remain mounted for the page visit; the named render action also opens an unrendered file explicitly. **Mark understood** records reversible, self-reported file progress in page memory only, shared with matching Semantic review. A new displayed revision resets it; answers and quiz checks never mark files understood. The theme switch changes only the page palette; dark is the initial theme. File/group and Conversations rails collapse independently without clearing drafts.
 
-Source syntax uses **GitHub Light** and **Ayu Dark** with the theme switch, including semantic excerpts, pinned context and quiz evidence. Grammars load locally on demand; unsupported or oversized excerpts stay plain text without hiding source. Highlighting never changes source text or diff backgrounds.
+Source syntax uses **GitHub Light** and **Ayu Dark** tokenization with the theme switch, including semantic excerpts, pinned context and quiz evidence. Files changed and Semantic review hunks apply the accessible diff-local keyword/string palette and dedicated addition/deletion row and gutter colors; feedback surfaces and application chrome remain unchanged. Grammars load locally on demand; unsupported or oversized excerpts stay plain text without hiding source. Highlighting never changes source text.
 
 For a text diff, click a **line number** or drag across numbers in the same old/head gutter column: releasing opens the question textbox directly beneath the selected range. There is no secondary Ask step. Code text and `+`/`−` markers do not trigger questions; text selection/copy stays native. Enter/Space on a focused line number opens the same textbox. The range must include changed text on one side within one hunk. The composer is pinned to that file/side/range/revision. **Send question** or Ctrl/Cmd+Enter explicitly starts backend work; Enter inserts a newline. Cancel retains the draft; resume or explicitly discard it before changing its selection or refreshing. Reading other files does not retarget it or permit a second initial draft. Non-text changes have no line questions.
 

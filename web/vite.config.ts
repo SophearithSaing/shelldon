@@ -22,7 +22,7 @@ export default defineConfig(async ({ command, mode }): Promise<UserConfig> => {
     server: {
       host: frontend.hostname.replace(/^\[|\]$/g, ''),
       port: Number(frontend.port),
-      strictPort: true,
+      strictPort: Boolean(process.env.SHELDON_DEV_ORIGIN),
       cors: false,
       allowedHosts: [frontend.hostname],
       fs: {

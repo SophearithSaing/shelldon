@@ -121,16 +121,27 @@ function highlighted(oldLine?: number, newLine?: number): boolean {
 .hunk-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); color: var(--muted); font: 10px/32px var(--mono); padding: 0 18px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .hunk-heading > span { min-width: 0; overflow-wrap: anywhere; }
 .rows { overflow-x: auto; }
-.line { display: flex; width: max-content; min-width: 100%; min-height: 27px; font: 11px/27px var(--mono); }
-.number { display: block; flex: 0 0 38px; text-align: right; padding: 0 10px 0 0; color: var(--muted); user-select: none; border: 0; background: transparent; font: inherit; }
+.line { display: flex; width: max-content; min-width: 100%; min-height: 27px; font: 11px/27px var(--mono); background: var(--ds-paper); color: var(--ds-ink); }
+.number { display: block; flex: 0 0 38px; text-align: right; padding: 0 10px 0 0; color: var(--ds-muted); user-select: none; border: 0; border-radius: 0; background: transparent; font: inherit; }
 button.number:not(:disabled) { cursor: pointer; }
-button.number:hover:not(:disabled) { color: var(--accent); background: var(--selected); }
-.sign { flex: 0 0 22px; color: var(--muted); text-align: center; user-select: none; }
+.sign { flex: 0 0 22px; color: var(--ds-muted); text-align: center; user-select: none; font-weight: 700; }
 code { display: block; white-space: pre; padding-right: 24px; font: inherit; }
-.added { background: var(--added-bg); }
-.removed { background: var(--removed-bg); }
-.added .sign { color: var(--added); }
-.removed .sign { color: var(--removed); }
-.selected { background: var(--selected); box-shadow: inset 2px 0 var(--accent); }
+.added { background: var(--ds-diff-add); }
+.removed { background: var(--ds-diff-del); }
+.added .number, .added .sign { background: var(--ds-diff-add-gutter); color: var(--ds-success); }
+.removed .number, .removed .sign { background: var(--ds-diff-del-gutter); color: var(--ds-error); }
+.selected { background: var(--ds-selected); box-shadow: inset 3px 0 var(--ds-accent); }
+.selected .number, .selected .sign { background: transparent; }
+.selected .number { color: var(--ds-muted); }
+.line button.number:hover:not(:disabled) { color: var(--ds-accent); background: var(--ds-accent-soft); }
+.hunk .rows :deep(.syntax-token) { color: var(--ds-ink); }
+:global([data-theme='light'] .hunk .rows .syntax-token.light-6a737d),
+:global([data-theme='dark'] .hunk .rows .syntax-token.dark-5a6673) { color: var(--ds-muted); }
+:global([data-theme='light'] .hunk .rows .syntax-token.light-d73a49),
+:global([data-theme='light'] .hunk .rows .syntax-token.light-6f42c1),
+:global([data-theme='dark'] .hunk .rows .syntax-token.dark-ff8f40),
+:global([data-theme='dark'] .hunk .rows .syntax-token.dark-f29668) { color: var(--ds-syntax-key); }
+:global([data-theme='light'] .hunk .rows .syntax-token.light-032f62),
+:global([data-theme='dark'] .hunk .rows .syntax-token.dark-aad94c) { color: var(--ds-syntax-str); }
 .no-newline { color: var(--muted); font-style: italic; }
 </style>
