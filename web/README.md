@@ -9,7 +9,9 @@ npm run dev:web
 
 Open <http://127.0.0.1:5173>, search the seeded library or enter a GitHub PR URL, and explicitly load pinned source. This development command starts only Vite and its local HTTP handlers. No Go, Git, OpenCode, credentials or external requests are needed. The application uses normal product UI; Overview capabilities without backend contracts say Coming soon.
 
-For the real Go backend, use `npm run dev` and the CLI as documented in the root README. There is one application and one set of browser API clients. No page/component imports fixtures or selects an API mode. Production builds never include the development API or fall back to it on failure.
+The default port is 5173; if busy, Vite tries the next free port and prints its actual URL. An explicit `SHELDON_DEV_ORIGIN` stays strict, including in automated tests. Host/Origin and HMR protections use the actual listener, not the preferred port.
+
+For the real Go backend, use `npm run dev` and the CLI as documented in the root README. Match the Go command's `SHELDON_DEV_ORIGIN` to Vite's printed origin if it moves off 5173. There is one application and one set of browser API clients. No page/component imports fixtures or selects an API mode. Production builds never include the development API or fall back to it on failure.
 
 ## Ownership
 
@@ -37,7 +39,7 @@ The home page is library-first: one aligned heading, filters/search and register
 
 ## Syntax highlighting
 
-Shiki 4.6.0 colors literal source with **GitHub Light** and **Ayu Dark**, following the app's theme switch. `SyntaxText.vue` renders escaped Vue text spans with external CSS classes, never HTML injection or inline token styles. Diff/selection backgrounds and line identities remain unchanged. The JavaScript regex engine needs neither WASM nor an eval exception in the release CSP. Themes, engine and path-selected grammars load from local bundled chunks; no CDN or backend calls are involved.
+Shiki 4.6.0 tokenizes literal source using **GitHub Light** and **Ayu Dark**, following the app's theme switch. Files changed and Semantic review hunks use a diff-local accessible palette: keyword and storage tokens use `--ds-syntax-key`, strings use `--ds-syntax-str`, comments use `--ds-muted`, and other tokens use `--ds-ink`. Quotes and quiz evidence retain the original Shiki palettes. `SyntaxText.vue` renders escaped Vue text spans with external CSS classes, never HTML injection or inline token styles. Dedicated `--ds-diff-*` fills and continuous gutter bands do not change the subtle feedback surfaces or neutral application chrome. Selection overrides row/gutter fills with an inset 3px accent edge; enabled line-number hover takes precedence. Literal text, line identities, compact geometry and question behavior are unchanged. The JavaScript regex engine needs neither WASM nor an eval exception in the release CSP. Themes, engine and path-selected grammars load from local bundled chunks; no CDN or backend calls are involved.
 
 The same renderer serves Files changed, semantic excerpts/remainder, conversation context and quiz evidence. Each hunk is tokenized as separate old/new source streams, without diff prefixes. Quotes reuse supplied hunk context when available; discontinuous coordinates reset grammar state. Hunk boundaries still omit full-file context, so coloring is best-effort rather than a parser/validation guarantee.
 
