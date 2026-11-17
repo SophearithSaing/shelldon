@@ -50,7 +50,7 @@ test('embedded syntax chunks render both palettes under the unchanged release CS
     await load(page)
     const file = page.getByRole('article', { name: 'Changed file syntax.ts', exact: true })
     const keyword = file.locator('.syntax-token').filter({ hasText: /^const$/ }).first()
-    await expect(keyword).toHaveCSS('color', 'rgb(255, 143, 64)')
+    await expect(keyword).toHaveCSS('color', 'rgb(201, 179, 227)')
     await expect(file.locator('code')).toHaveText('export const message: string = "<script>literal</script>"')
     await expect(file.locator('code[style], code [style], script, img')).toHaveCount(0)
     const copied = await file.locator('code').evaluate((element): string => {
@@ -64,7 +64,7 @@ test('embedded syntax chunks render both palettes under the unchanged release CS
     expect(copied).toBe('export const message: string = "<script>literal</script>"')
     await page.screenshot({ path: info.outputPath('embedded-syntax-ayu-dark.png') })
     await page.getByRole('button', { name: 'Switch to light theme', exact: true }).click()
-    await expect(keyword).toHaveCSS('color', 'rgb(215, 58, 73)')
+    await expect(keyword).toHaveCSS('color', 'rgb(128, 90, 149)')
     await page.screenshot({ path: info.outputPath('embedded-syntax-github-light.png') })
     await expect(page.getByRole('article', { name: 'Changed file shared.txt', exact: true }).locator('.syntax-token')).toHaveCount(0)
     await file.locator('code').click()

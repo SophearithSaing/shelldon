@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { SourceResponse } from '../../src/api/contracts/source'
 import { ask, completed, generate, load, open } from './helpers'
 
-test('diff tokens use Ayu Dark and GitHub Light without inline styles or changed source text', async ({ page }, info): Promise<void> => {
+test('diff tokens use the accessible light and dark palettes without inline styles or changed source text', async ({ page }, info): Promise<void> => {
   await open(page, 1901)
   const received = page.waitForResponse((response): boolean => response.url().endsWith('/source'))
   await load(page)
@@ -10,14 +10,14 @@ test('diff tokens use Ayu Dark and GitHub Light without inline styles or changed
   if (source.state !== 'ready') throw new Error('Expected pinned source.')
   const file = page.getByRole('article', { name: 'Changed file src/auth/refresh.ts', exact: true })
   const keyword = file.locator('.syntax-token').filter({ hasText: /^const$/ }).first()
-  await expect(keyword).toHaveCSS('color', 'rgb(255, 143, 64)')
+  await expect(keyword).toHaveCSS('color', 'rgb(201, 179, 227)')
   expect(await file.locator('code').allTextContents()).toEqual(source.diff.files[0]!.hunks![0]!.lines.map((line): string => line.text))
   await expect(file.locator('.syntax-token[style]')).toHaveCount(0)
   await expect(file.locator('.added').first()).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await page.screenshot({ path: info.outputPath('syntax-ayu-dark.png') })
   const text = await file.locator('code').allTextContents()
   await page.getByRole('button', { name: 'Switch to light theme', exact: true }).click()
-  await expect(keyword).toHaveCSS('color', 'rgb(215, 58, 73)')
+  await expect(keyword).toHaveCSS('color', 'rgb(128, 90, 149)')
   expect(await file.locator('code').allTextContents()).toEqual(text)
   await page.screenshot({ path: info.outputPath('syntax-github-light.png') })
 })
@@ -38,10 +38,10 @@ test('old and new grammar states stay separate and highlighted HTML stays litera
     await route.fulfill({ json: source })
   })
   await load(page)
-  await expect(page.locator('[data-line="old-open"] .syntax-token').first()).toHaveCSS('color', 'rgb(90, 102, 115)')
-  await expect(page.locator('[data-line="new-code"] .syntax-token').first()).toHaveCSS('color', 'rgb(255, 143, 64)')
-  await expect(page.locator('[data-line="context"] .syntax-token').first()).not.toHaveCSS('color', 'rgb(90, 102, 115)')
-  await expect(page.locator('[data-line="old-close"] .syntax-token').first()).toHaveCSS('color', 'rgb(90, 102, 115)')
+  await expect(page.locator('[data-line="old-open"] .syntax-token').first()).toHaveCSS('color', 'rgb(170, 176, 184)')
+  await expect(page.locator('[data-line="new-code"] .syntax-token').first()).toHaveCSS('color', 'rgb(201, 179, 227)')
+  await expect(page.locator('[data-line="context"] .syntax-token').first()).not.toHaveCSS('color', 'rgb(170, 176, 184)')
+  await expect(page.locator('[data-line="old-close"] .syntax-token').first()).toHaveCSS('color', 'rgb(170, 176, 184)')
   await expect(page.locator('[data-line="new-html"] code')).toHaveText('const html = "<script>literal</script>"')
   await expect(page.locator('.pinned-diff script, .pinned-diff img')).toHaveCount(0)
 })
